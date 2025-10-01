@@ -1,2 +1,4 @@
-/target
 .bacon-locations
+.direnv
+/target
+result
