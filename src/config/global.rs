@@ -83,6 +83,10 @@ pub struct GamescopeConfig {
     /// Additional pre_command for Gamescope only
     #[serde(default)]
     pub pre_command: Option<String>,
+
+    /// Arguments to pass to gamescope
+    #[serde(default)]
+    pub args: Option<String>,
 }
 
 impl Default for GamescopeConfig {
@@ -90,6 +94,7 @@ impl Default for GamescopeConfig {
         Self {
             skip_pre_command: true,
             pre_command: None,
+            args: None,
         }
     }
 }

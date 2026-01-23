@@ -1,5 +1,5 @@
 use crate::cli::ConfigAction;
-use crate::config::{get_config_path, get_game_config_path, GlobalConfig};
+use crate::config::{get_config_path, get_game_config_path};
 use crate::error::AppError;
 use std::fs;
 use tracing::info;
@@ -45,10 +45,43 @@ fn init_config() -> Result<(), AppError> {
         fs::create_dir_all(parent)?;
     }
 
-    // Write default config
-    let default_config = GlobalConfig::default();
-    let content = toml::to_string_pretty(&default_config)?;
-    fs::write(&path, content)?;
+    // Write default config with comments
+    let template = r#"# Steam Command Runner - Global Configuration
+
+# Pre-command to prepend to game launches (e.g., gamemoderun, mangohud)
+# pre_command = "gamemoderun"
+
+# Default Proton version (name as shown in Steam, or path)
+# default_proton = "Proton 9.0"
+
+# Default execution mode: native | proton | auto
+default_mode = "auto"
+
+# Global environment variables applied to all games
+[env]
+# MANGOHUD = "1"
+# DXVK_ASYNC = "1"
+
+# Gamescope-specific settings
+[gamescope]
+# Skip pre_command when in Gamescope session
+skip_pre_command = true
+# Additional pre_command for Gamescope only
+# pre_command = ""
+# Arguments to pass to gamescope (e.g., "-w 1920 -h 1080 -f")
+# args = ""
+
+# Pre-launch hook (runs before game starts)
+[hooks]
+# [hooks.pre_launch]
+# command = "/path/to/script.sh"
+# wait = true
+
+# [hooks.post_exit]
+# command = "/path/to/cleanup.sh"
+# wait = false
+"#;
+    fs::write(&path, template)?;
 
     info!("Created default config at: {}", path.display());
     println!("Created default config at: {}", path.display());
@@ -71,14 +104,32 @@ fn edit_config(app_id: Option<u32>) -> Result<(), AppError> {
     if !path.exists() {
         if let Some(id) = app_id {
             let template = format!(
-                "# Per-game configuration for Steam App ID {}\n\
-                # name = \"Game Name\"\n\
-                # mode = \"proton\"  # native | proton | auto\n\
-                # proton = \"Proton 9.0\"\n\
-                # pre_command = \"gamemoderun\"\n\
-                \n\
-                [env]\n\
-                # MANGOHUD = \"1\"\n",
+                r#"# Per-game configuration for Steam App ID {}
+
+# Display name (for logging)
+# name = "Game Name"
+
+# Execution mode: native | proton | auto
+# mode = "proton"
+
+# Specific Proton version (overrides global)
+# proton = "Proton 9.0"
+
+# Pre-command (use "inherit" to include global pre_command)
+# pre_command = "inherit mangohud"
+
+# Game-specific environment variables
+[env]
+# MANGOHUD = "1"
+
+# Game-specific gamescope arguments (overrides global)
+# gamescope_args = "-w 1920 -h 1080 -f"
+
+# Game-specific hooks
+# [hooks.pre_launch]
+# command = "/path/to/script.sh"
+# wait = true
+"#,
                 id
             );
             fs::write(&path, template)?;

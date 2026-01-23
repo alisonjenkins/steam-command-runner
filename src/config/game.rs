@@ -33,4 +33,8 @@ pub struct GameConfig {
     /// Game-specific hooks (override global hooks)
     #[serde(default)]
     pub hooks: HooksConfig,
+
+    /// Game-specific gamescope arguments (overrides global)
+    #[serde(default)]
+    pub gamescope_args: Option<String>,
 }

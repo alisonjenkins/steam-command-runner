@@ -45,6 +45,9 @@ pub struct MergedConfig {
 
     /// Skip pre_command in Gamescope
     pub skip_pre_command_in_gamescope: bool,
+
+    /// Arguments to pass to gamescope
+    pub gamescope_args: Option<String>,
 }
 
 impl MergedConfig {
@@ -116,6 +119,9 @@ impl MergedConfig {
             .post_exit
             .or(global.hooks.post_exit);
 
+        // Gamescope args: game overrides global
+        let gamescope_args = game.gamescope_args.or(global.gamescope.args);
+
         Self {
             app_id,
             name: game.name,
@@ -129,6 +135,7 @@ impl MergedConfig {
             is_gamescope_session: is_gamescope,
             gamescope_pre_command: global.gamescope.pre_command,
             skip_pre_command_in_gamescope: global.gamescope.skip_pre_command,
+            gamescope_args,
         }
     }
 
