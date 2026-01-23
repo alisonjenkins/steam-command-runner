@@ -77,6 +77,12 @@ pub enum Commands {
         action: ConfigAction,
     },
 
+    /// Proton version management
+    Proton {
+        #[command(subcommand)]
+        action: ProtonAction,
+    },
+
     /// Compatibility tool entry point (called by Steam)
     #[command(hide = true)]
     Compat {
@@ -113,5 +119,15 @@ pub enum ConfigAction {
         /// App ID to show path for (omit for global config)
         #[arg(short, long)]
         app_id: Option<u32>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ProtonAction {
+    /// List available Proton versions
+    List {
+        /// Show full paths instead of just names
+        #[arg(short, long)]
+        paths: bool,
     },
 }

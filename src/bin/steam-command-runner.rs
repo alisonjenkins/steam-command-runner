@@ -1,7 +1,8 @@
 use clap::Parser;
 use std::process::ExitCode;
 use steam_command_runner::cli::commands::{
-    handle_compat, handle_config, handle_install, handle_run, handle_search, handle_uninstall,
+    handle_compat, handle_config, handle_install, handle_proton, handle_run, handle_search,
+    handle_uninstall,
 };
 use steam_command_runner::{AppError, Cli, Commands};
 use tracing::Level;
@@ -57,6 +58,11 @@ fn run(cli: Cli) -> Result<ExitCode, AppError> {
 
         Some(Commands::Config { action }) => {
             handle_config(action)?;
+            Ok(ExitCode::SUCCESS)
+        }
+
+        Some(Commands::Proton { action }) => {
+            handle_proton(action)?;
             Ok(ExitCode::SUCCESS)
         }
 

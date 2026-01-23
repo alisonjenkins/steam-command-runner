@@ -139,6 +139,7 @@ fn is_valid_proton(path: &PathBuf) -> bool {
 /// List available Proton versions
 pub fn list_proton_versions() -> Vec<(String, PathBuf)> {
     let mut versions = Vec::new();
+    let mut seen_names = std::collections::HashSet::new();
     let search_paths = get_search_paths();
 
     for base_path in search_paths {
@@ -147,12 +148,72 @@ pub fn list_proton_versions() -> Vec<(String, PathBuf)> {
                 let path = entry.path();
                 if is_valid_proton(&path) {
                     let name = entry.file_name().to_string_lossy().to_string();
-                    versions.push((name, path));
+                    // Deduplicate by name (keep first occurrence)
+                    if seen_names.insert(name.clone()) {
+                        versions.push((name, path));
+                    }
                 }
             }
         }
     }
 
-    versions.sort_by(|a, b| a.0.cmp(&b.0));
+    // Sort using natural version ordering
+    versions.sort_by(|a, b| compare_version_names(&a.0, &b.0));
     versions
+}
+
+/// Compare version names with natural ordering
+/// Handles cases like "GE-Proton9-1" < "GE-Proton9-10" < "GE-Proton10-1"
+fn compare_version_names(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_parts = split_version_parts(a);
+    let b_parts = split_version_parts(b);
+
+    for (a_part, b_part) in a_parts.iter().zip(b_parts.iter()) {
+        let ord = compare_parts(a_part, b_part);
+        if ord != std::cmp::Ordering::Equal {
+            return ord;
+        }
+    }
+
+    // If all compared parts are equal, shorter name comes first
+    a_parts.len().cmp(&b_parts.len())
+}
+
+/// Split a version string into parts (alternating text and numbers)
+fn split_version_parts(s: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_number = false;
+
+    for c in s.chars() {
+        let is_digit = c.is_ascii_digit();
+        if current.is_empty() {
+            in_number = is_digit;
+            current.push(c);
+        } else if is_digit == in_number {
+            current.push(c);
+        } else {
+            parts.push(current);
+            current = String::new();
+            current.push(c);
+            in_number = is_digit;
+        }
+    }
+
+    if !current.is_empty() {
+        parts.push(current);
+    }
+
+    parts
+}
+
+/// Compare two parts - numeric parts compared as numbers, text as strings
+fn compare_parts(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_num: Option<u64> = a.parse().ok();
+    let b_num: Option<u64> = b.parse().ok();
+
+    match (a_num, b_num) {
+        (Some(a_n), Some(b_n)) => a_n.cmp(&b_n),
+        _ => a.to_lowercase().cmp(&b.to_lowercase()),
+    }
 }
