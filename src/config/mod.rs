@@ -1,62 +1,35 @@
 mod error;
+mod game;
+mod global;
+mod merged;
 
-pub use error::ConfigLoadError;
-use serde::Deserialize;
-use std::io::Read;
+pub use error::ConfigError;
+pub use game::GameConfig;
+pub use global::{ExecutionMode, GlobalConfig, GamescopeConfig, HookConfig, HooksConfig};
+pub use merged::MergedConfig;
+
 use std::path::PathBuf;
 
-#[derive(Debug, Default, Deserialize)]
-pub struct Config {
-    pub pre_command: Option<String>,
+/// Get the global config file path
+pub fn get_config_path() -> PathBuf {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from(".config"));
+    config_dir.join("steam-command-runner").join("config.toml")
 }
 
-fn get_config_path() -> Option<PathBuf> {
-    if let Ok(value) = std::env::var("XDG_CONFIG_HOME") {
-        let path: PathBuf = value.into();
-        let path = path.join(".config/steamdeck-command-runner/config.toml");
-        if path.exists() {
-            return Some(path);
-        }
-    };
-
-    if let Ok(value) = std::env::var("HOME") {
-        let path: PathBuf = value.into();
-        let path = path.join(".config/steamdeck-command-runner/config.toml");
-        if path.exists() {
-            return Some(path);
-        }
-    };
-
-    None
+/// Get the game-specific config file path
+pub fn get_game_config_path(app_id: u32) -> PathBuf {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from(".config"));
+    config_dir
+        .join("steam-command-runner")
+        .join("games")
+        .join(format!("{}.toml", app_id))
 }
 
-impl Config {
-    pub fn load(&mut self, path: Option<PathBuf>) -> Result<(), ConfigLoadError> {
-        let config_file_path = if let Some(path) = path {
-            path
-        } else if let Some(path) = get_config_path() {
-            path
-        } else {
-            return Err(ConfigLoadError::CouldNotFind);
-        };
-
-        let mut config_file = std::fs::File::open(&config_file_path).map_err(|source| {
-            ConfigLoadError::CouldNotOpen {
-                path: config_file_path.as_path().display().to_string(),
-                source,
-            }
-        })?;
-
-        let mut buffer = String::new();
-        config_file.read_to_string(&mut buffer).map_err(|source| {
-            ConfigLoadError::CouldNotRead {
-                path: config_file_path.as_path().display().to_string(),
-                source,
-            }
-        })?;
-
-        *self = toml::from_str(&buffer)?;
-
-        Ok(())
-    }
+/// Get the games config directory
+pub fn get_games_config_dir() -> PathBuf {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from(".config"));
+    config_dir.join("steam-command-runner").join("games")
 }

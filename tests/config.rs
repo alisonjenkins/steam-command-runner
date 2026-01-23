@@ -1,11 +1,11 @@
 use cucumber::{given, then, when, World};
 use std::path::PathBuf;
-use steamdeck_command_runner::{Config, ConfigLoadError};
+use steam_command_runner::config::{GlobalConfig, ConfigError};
 
 #[derive(Debug, Default, World)]
 pub struct ConfigWorld {
     config_path: PathBuf,
-    config: Config,
+    config: GlobalConfig,
 }
 
 #[given(regex = "the config file (.*)")]
@@ -14,8 +14,10 @@ fn config_file(world: &mut ConfigWorld, path: PathBuf) {
 }
 
 #[when("I load the config")]
-fn load_config(world: &mut ConfigWorld) -> Result<(), ConfigLoadError> {
-    Config::load(&mut world.config, Some(world.config_path.clone()))
+fn load_config(world: &mut ConfigWorld) -> Result<(), ConfigError> {
+    let content = std::fs::read_to_string(&world.config_path)?;
+    world.config = toml::from_str(&content)?;
+    Ok(())
 }
 
 #[then(regex = "the config has pre-command set to \"(.*)\"")]

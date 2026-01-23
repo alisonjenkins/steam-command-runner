@@ -1,4 +1,12 @@
-mod config;
-pub mod steam_command_runner;
-pub use config::{Config, ConfigLoadError};
-pub use steam_command_runner::{error::SteamCommandRunnerError, SteamCommandRunner};
+pub mod cli;
+pub mod compat_tool;
+pub mod config;
+pub mod error;
+pub mod hooks;
+pub mod proton;
+pub mod runner;
+pub mod steam_api;
+
+pub use cli::{Cli, Commands, ConfigAction};
+pub use config::{ConfigError, ExecutionMode, GlobalConfig, MergedConfig};
+pub use error::AppError;

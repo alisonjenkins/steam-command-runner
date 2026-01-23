@@ -1,17 +1,47 @@
 [package]
-name = "steamdeck-command-runner"
-version = "0.1.0"
+name = "steam-command-runner"
+version = "0.2.0"
 edition = "2021"
+description = "A Steam compatibility tool and command wrapper for Linux gaming"
+license = "MIT"
+repository = "https://github.com/alisonjenkins/steam-command-runner"
+
+[[bin]]
+name = "steam-command-runner"
+path = "src/bin/steam-command-runner.rs"
 
 [dependencies]
-serde = {version = "1", features = ["derive"]}
-shlex = "1.3.0"
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# VDF file handling
+keyvalues-serde = "0.2"
+
+# HTTP client for Steam API
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls", "gzip"] }
+
+# Path handling
+dirs = "5"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Shell command parsing
+shlex = "1.3"
+
+# Error handling
 thiserror = "2"
-toml = "0.9"
 
 [dev-dependencies]
 cucumber = "0.21"
 futures = "0.3"
+tempfile = "3"
 
 [[test]]
 name = "config"
