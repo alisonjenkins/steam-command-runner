@@ -76,6 +76,10 @@ fn default_wait() -> bool {
 /// Gamescope-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GamescopeConfig {
+    /// Whether to wrap games with gamescope (default: true)
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
     /// Skip pre_command when in Gamescope session (default: true)
     #[serde(default = "default_skip_pre_command")]
     pub skip_pre_command: bool,
@@ -92,11 +96,16 @@ pub struct GamescopeConfig {
 impl Default for GamescopeConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             skip_pre_command: true,
             pre_command: None,
             args: None,
         }
     }
+}
+
+fn default_enabled() -> bool {
+    true
 }
 
 fn default_skip_pre_command() -> bool {

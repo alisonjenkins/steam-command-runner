@@ -37,4 +37,8 @@ pub struct GameConfig {
     /// Game-specific gamescope arguments (overrides global)
     #[serde(default)]
     pub gamescope_args: Option<String>,
+
+    /// Whether to enable gamescope for this game (overrides global)
+    #[serde(default)]
+    pub gamescope_enabled: Option<bool>,
 }

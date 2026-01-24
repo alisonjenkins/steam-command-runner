@@ -48,6 +48,9 @@ pub struct MergedConfig {
 
     /// Arguments to pass to gamescope
     pub gamescope_args: Option<String>,
+
+    /// Whether gamescope is enabled
+    pub gamescope_enabled: bool,
 }
 
 impl MergedConfig {
@@ -122,6 +125,9 @@ impl MergedConfig {
         // Gamescope args: game overrides global
         let gamescope_args = game.gamescope_args.or(global.gamescope.args);
 
+        // Gamescope enabled: game overrides global
+        let gamescope_enabled = game.gamescope_enabled.unwrap_or(global.gamescope.enabled);
+
         Self {
             app_id,
             name: game.name,
@@ -136,6 +142,7 @@ impl MergedConfig {
             gamescope_pre_command: global.gamescope.pre_command,
             skip_pre_command_in_gamescope: global.gamescope.skip_pre_command,
             gamescope_args,
+            gamescope_enabled,
         }
     }
 

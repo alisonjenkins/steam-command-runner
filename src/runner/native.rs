@@ -14,9 +14,11 @@ impl<'a> NativeRunner<'a> {
     }
 
     pub fn run(&self, mut command: Vec<String>) -> Result<ExitCode, AppError> {
-        // Add gamescope wrapper if configured and not already in a gamescope session
-        if let Some(ref gs_args) = self.config.gamescope_args {
-            if !self.config.is_gamescope_session {
+        // Add gamescope wrapper if enabled and not already in a gamescope session
+        if self.config.gamescope_enabled {
+            if self.config.is_gamescope_session {
+                debug!("Already in gamescope session, skipping gamescope wrapper");
+            } else if let Some(ref gs_args) = self.config.gamescope_args {
                 let gs_args_parsed = shlex::split(gs_args)
                     .ok_or_else(|| AppError::GamescopeArgsParse(gs_args.to_string()))?;
 
@@ -28,8 +30,6 @@ impl<'a> NativeRunner<'a> {
                 gs_command.push("--".to_string());
                 gs_command.extend(command);
                 command = gs_command;
-            } else {
-                debug!("Already in gamescope session, skipping gamescope wrapper");
             }
         }
 

@@ -64,6 +64,8 @@ default_mode = "auto"
 
 # Gamescope-specific settings
 [gamescope]
+# Enable gamescope wrapper (default: true)
+# enabled = true
 # Skip pre_command when in Gamescope session
 skip_pre_command = true
 # Additional pre_command for Gamescope only
@@ -118,12 +120,15 @@ fn edit_config(app_id: Option<u32>) -> Result<(), AppError> {
 # Pre-command (use "inherit" to include global pre_command)
 # pre_command = "inherit mangohud"
 
+# Game-specific gamescope arguments (overrides global)
+# gamescope_args = "-w 1920 -h 1080 -f"
+
+# Disable gamescope for this game (e.g., for Steam Input compatibility)
+# gamescope_enabled = false
+
 # Game-specific environment variables
 [env]
 # MANGOHUD = "1"
-
-# Game-specific gamescope arguments (overrides global)
-# gamescope_args = "-w 1920 -h 1080 -f"
 
 # Game-specific hooks
 # [hooks.pre_launch]
