@@ -26,6 +26,22 @@ impl<'a> ProtonRunner<'a> {
         // Build the Proton command
         let mut full_command = Vec::new();
 
+        // Add gamescope wrapper if configured and not already in a gamescope session
+        if let Some(ref gs_args) = self.config.gamescope_args {
+            if !self.config.is_gamescope_session {
+                let gs_args_parsed = shlex::split(gs_args)
+                    .ok_or_else(|| AppError::GamescopeArgsParse(gs_args.to_string()))?;
+
+                debug!("Wrapping with gamescope: {:?}", gs_args_parsed);
+
+                full_command.push("gamescope".to_string());
+                full_command.extend(gs_args_parsed);
+                full_command.push("--".to_string());
+            } else {
+                debug!("Already in gamescope session, skipping gamescope wrapper");
+            }
+        }
+
         // Add pre-command if configured
         if let Some(pre_cmd) = self.config.effective_pre_command() {
             let pre_args = shlex::split(pre_cmd)

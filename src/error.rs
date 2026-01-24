@@ -17,6 +17,9 @@ pub enum AppError {
     #[error("Could not parse pre-command: {0}")]
     PreCommandParse(String),
 
+    #[error("Could not parse gamescope args: {0}")]
+    GamescopeArgsParse(String),
+
     #[error("Steam installation not found. Checked: {0:?}")]
     SteamNotFound(Vec<std::path::PathBuf>),
 
