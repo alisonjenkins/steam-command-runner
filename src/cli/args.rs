@@ -98,8 +98,12 @@ pub enum ConfigAction {
     /// Edit configuration in default editor
     Edit {
         /// App ID to edit (omit for global config)
-        #[arg(short, long)]
+        #[arg(short, long, conflicts_with = "name")]
         app_id: Option<u32>,
+
+        /// Game name to search for (resolves to App ID)
+        #[arg(short, long, conflicts_with = "app_id")]
+        name: Option<String>,
     },
 
     /// Show configuration file path

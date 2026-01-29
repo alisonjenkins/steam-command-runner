@@ -61,4 +61,7 @@ pub enum AppError {
 
     #[error("Failed to parse gamescope shim arguments: {0}")]
     GamescopeShimParseFailed(String),
+
+    #[error("Game not found: {0}")]
+    GameNotFound(String),
 }

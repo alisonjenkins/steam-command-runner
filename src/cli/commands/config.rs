@@ -9,7 +9,7 @@ pub fn handle_config(action: ConfigAction) -> Result<(), AppError> {
     match action {
         ConfigAction::Show { app_id } => show_config(app_id),
         ConfigAction::Init => init_config(),
-        ConfigAction::Edit { app_id } => edit_config(app_id),
+        ConfigAction::Edit { app_id, name } => edit_config(app_id, name),
         ConfigAction::Path { app_id } => show_path(app_id),
     }
 }
@@ -91,7 +91,21 @@ skip_pre_command = true
     Ok(())
 }
 
-fn edit_config(app_id: Option<u32>) -> Result<(), AppError> {
+fn edit_config(app_id: Option<u32>, name: Option<String>) -> Result<(), AppError> {
+    let app_id = if let Some(name) = name {
+        // Search for the game
+        let results = crate::steam_api::search_games(&name, 1)?;
+        match results.first() {
+            Some((id, found_name)) => {
+                println!("Found game: {} ({})", found_name, id);
+                Some(*id)
+            }
+            None => return Err(AppError::GameNotFound(name)),
+        }
+    } else {
+        app_id
+    };
+
     let path = match app_id {
         Some(id) => get_game_config_path(id),
         None => get_config_path(),
