@@ -157,6 +157,13 @@ impl<'a> ProtonRunner<'a> {
         // Build the Proton command
         let mut full_command = Vec::new();
 
+        // Add pre-command if configured
+        if let Some(pre_cmd) = self.config.effective_pre_command() {
+            let pre_args = shlex::split(pre_cmd)
+                .ok_or_else(|| AppError::PreCommandParse(pre_cmd.to_string()))?;
+            full_command.extend(pre_args);
+        }
+
         // Track if we're adding gamescope (needed for LD_PRELOAD handling)
         let mut using_gamescope = false;
 
@@ -196,12 +203,7 @@ impl<'a> ProtonRunner<'a> {
             }
         }
 
-        // Add pre-command if configured
-        if let Some(pre_cmd) = self.config.effective_pre_command() {
-            let pre_args = shlex::split(pre_cmd)
-                .ok_or_else(|| AppError::PreCommandParse(pre_cmd.to_string()))?;
-            full_command.extend(pre_args);
-        }
+
 
         // Add Proton executable
         let proton_exe = self.proton_path.join("proton");
