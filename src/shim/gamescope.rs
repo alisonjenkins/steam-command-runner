@@ -49,8 +49,6 @@ fn get_app_id() -> Option<u32> {
         .and_then(|s| s.parse().ok())
 }
 
-
-
 /// Find the real gamescope binary, excluding ourselves
 fn find_real_gamescope() -> Option<PathBuf> {
     // Get our own inode to exclude from search
@@ -143,8 +141,34 @@ pub fn handle_gamescope_shim() -> ExitCode {
     cmd.args(&all_gamescope_args);
     log_to_file(&format!("Executing: {:?} args: {:?}", real_gamescope, all_gamescope_args), debug_enabled);
 
+    // We CANNOT successfully set LD_PRELOAD on the gamescope process itself
+    // because gamescope has capabilities (cap_sys_nice) which causes the OS to strip insecure env vars.
+    // Instead, we must inject it into the INNER command using 'env'.
+
+    // Set Gamescope Overlay variables (These are likely safe from stripping or gamescope might use them)
+    log_to_file("Setting ENABLE_VK_LAYER_VALVE_steam_overlay_1=1", debug_enabled);
+    cmd.env("ENABLE_VK_LAYER_VALVE_steam_overlay_1", "1");
+    
+    log_to_file("Setting ENABLE_GAMESCOPE_WSI=1", debug_enabled);
+    cmd.env("ENABLE_GAMESCOPE_WSI", "1");
+
+    // Copy STEAM_GAMESCOPE_* env vars
+    cmd.env("STEAM_GAMESCOPE_NIS_SUPPORTED", "1");
+    cmd.env("STEAM_GAMESCOPE_HDR_SUPPORTED", "1");
+    cmd.env("STEAM_GAMESCOPE_VRR_SUPPORTED", "1");
+    cmd.env("STEAM_GAMESCOPE_TEARING_SUPPORTED", "1");
+    cmd.env("STEAM_GAMESCOPE_HAS_TEARING_SUPPORT", "1");
+
     if !command.is_empty() {
         cmd.arg("--");
+        
+        // Inject Steam Overlay via env wrapper in inner command
+        if let Some(ld_preload) = build_ld_preload_with_overlay(debug_enabled) {
+            log_to_file(&format!("Injecting LD_PRELOAD via inner 'env' wrapper: {}", ld_preload), debug_enabled);
+            cmd.arg("env");
+            cmd.arg(format!("LD_PRELOAD={}", ld_preload));
+        }
+
         cmd.args(&command);
     }
 
@@ -153,6 +177,51 @@ pub fn handle_gamescope_shim() -> ExitCode {
     log_to_file(&format!("Error: Failed to exec gamescope: {}", err), debug_enabled);
     eprintln!("Error: Failed to exec gamescope: {}", err);
     ExitCode::FAILURE
+}
+
+/// Get the Steam overlay library paths for LD_PRELOAD
+fn get_steam_overlay_paths(debug: bool) -> Option<String> {
+    // Try to find Steam installation path
+    let home = std::env::var("HOME").ok()?;
+    let steam_path = PathBuf::from(&home).join(".local/share/Steam");
+
+    let overlay_64 = steam_path.join("ubuntu12_64/gameoverlayrenderer.so");
+    let overlay_32 = steam_path.join("ubuntu12_32/gameoverlayrenderer.so");
+
+    if overlay_64.exists() {
+        let mut paths = overlay_64.to_string_lossy().to_string();
+        if overlay_32.exists() {
+            paths.push(':');
+            paths.push_str(&overlay_32.to_string_lossy());
+        }
+        log_to_file(&format!("Found Steam overlay paths: {}", paths), debug);
+        Some(paths)
+    } else {
+        log_to_file("Steam overlay 64-bit library not found!", debug);
+        None
+    }
+}
+
+/// Build LD_PRELOAD value with Steam overlay added
+fn build_ld_preload_with_overlay(debug: bool) -> Option<String> {
+    let overlay_paths = get_steam_overlay_paths(debug)?;
+
+    // Check existing LD_PRELOAD
+    let existing_preload = std::env::var("LD_PRELOAD").ok();
+    
+    if let Some(existing) = existing_preload {
+        if existing.contains("gameoverlayrenderer.so") {
+            log_to_file("LD_PRELOAD already contains gameoverlayrenderer.so, mimicking it", debug);
+            Some(existing)
+        } else {
+            let new_preload = format!("{}:{}", overlay_paths, existing);
+            log_to_file(&format!("Prepending overlay to existing LD_PRELOAD"), debug);
+            Some(new_preload)
+        }
+    } else {
+        log_to_file("Setting new LD_PRELOAD with overlay", debug);
+        Some(overlay_paths)
+    }
 }
 
 fn log_to_file(message: &str, enabled: bool) {
