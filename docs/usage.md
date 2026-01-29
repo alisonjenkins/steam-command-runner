@@ -98,3 +98,16 @@ You can bulk-manage Steam launch options to apply standard fixes or tools.
 -   **Set Single**: `steam-command-runner launch-options set --app-id 12345 --options "gamemoderun %command%"`
 -   **Set All**: `steam-command-runner launch-options set-all` (Applying a default template)
 -   **Clear All**: `steam-command-runner launch-options clear-all`
+
+## Troubleshooting
+
+### Shim Not Working (PATH Issues)
+If you set the launch option to `gamescope %command%` but the runner config isn't applying (e.g., arguments missing), Steam might be using the system `gamescope` instead of the shim in `~/.local/bin`.
+
+This happens if `~/.local/bin` is not in Steam's `PATH`.
+
+**Solution**: Use the absolute path to the shim in your launch options:
+```bash
+/home/YOUR_USER/.local/bin/gamescope %command%
+```
+*(Replace `YOUR_USER` with your actual username)*
