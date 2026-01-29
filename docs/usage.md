@@ -106,8 +106,9 @@ If you set the launch option to `gamescope %command%` but the runner config isn'
 
 This happens if `~/.local/bin` is not in Steam's `PATH`.
 
-**Solution**: Use the absolute path to the shim in your launch options:
+**Solution**: Use the absolute path to the shim **AND** include `--` to separate the gamescope arguments from the command. This is critical for compatibility with Steam's wrappers.
+
 ```bash
-/home/YOUR_USER/.local/bin/gamescope %command%
+/home/YOUR_USER/.local/bin/gamescope -- %command%
 ```
 *(Replace `YOUR_USER` with your actual username)*
