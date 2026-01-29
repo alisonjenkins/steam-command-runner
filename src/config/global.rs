@@ -27,6 +27,10 @@ pub struct GlobalConfig {
     /// Gamescope-specific settings
     #[serde(default)]
     pub gamescope: GamescopeConfig,
+
+    /// Enable debug logging for the shim (default: false)
+    #[serde(default)]
+    pub shim_debug: bool,
 }
 
 /// Execution mode for games

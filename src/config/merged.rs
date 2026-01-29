@@ -51,6 +51,9 @@ pub struct MergedConfig {
 
     /// Whether gamescope is enabled
     pub gamescope_enabled: bool,
+
+    /// Whether shim debug logging is enabled
+    pub shim_debug: bool,
 }
 
 impl MergedConfig {
@@ -143,6 +146,7 @@ impl MergedConfig {
             skip_pre_command_in_gamescope: global.gamescope.skip_pre_command,
             gamescope_args,
             gamescope_enabled,
+            shim_debug: global.shim_debug,
         }
     }
 
