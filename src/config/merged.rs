@@ -160,9 +160,15 @@ impl MergedConfig {
     }
 }
 
-/// Check if running in a Gamescope session
+/// Check if running in a Gamescope session or if the wrapper script is handling gamescope
 fn is_gamescope_session() -> bool {
-    std::env::var("XDG_CURRENT_DESKTOP")
+    // Check if we're inside a gamescope session
+    let in_gamescope = std::env::var("XDG_CURRENT_DESKTOP")
         .map(|v| v.to_lowercase() == "gamescope")
-        .unwrap_or(false)
+        .unwrap_or(false);
+
+    // Check if the wrapper script is handling gamescope for us
+    let wrapper_handling = std::env::var("STEAM_CMD_RUNNER_GAMESCOPE_HANDLED").is_ok();
+
+    in_gamescope || wrapper_handling
 }

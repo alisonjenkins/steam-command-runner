@@ -3,11 +3,10 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "steam-command-runner")]
-#[command(version, about = "Steam compatibility tool and command wrapper for Linux gaming")]
-#[command(after_help = "Use as a Steam compatibility tool or standalone command wrapper.\n\n\
-    Examples:\n  \
+#[command(version, about = "Command wrapper for Linux gaming with gamescope integration")]
+#[command(after_help = "Examples:\n  \
     steam-command-runner run /path/to/game\n  \
-    steam-command-runner install\n  \
+    steam-command-runner launch-options set-all --dry-run\n  \
     steam-command-runner search \"Half-Life\"")]
 pub struct Cli {
     #[command(subcommand)]
@@ -20,10 +19,6 @@ pub struct Cli {
     /// Config file path override
     #[arg(short, long, global = true)]
     pub config: Option<PathBuf>,
-
-    /// Arguments passed directly (for legacy/compatibility tool mode)
-    #[arg(trailing_var_arg = true, hide = true)]
-    pub args: Vec<String>,
 }
 
 #[derive(Subcommand)]
@@ -39,26 +34,18 @@ pub enum Commands {
         command: Vec<String>,
     },
 
-    /// Install as a Steam compatibility tool
+    /// Install the gamescope shim symlink
     Install {
-        /// Custom tool name (default: steam-command-runner)
+        /// Custom path for the symlink (default: ~/.local/bin/gamescope)
         #[arg(short, long)]
-        name: Option<String>,
-
-        /// Steam installation path override
-        #[arg(short, long)]
-        steam_path: Option<PathBuf>,
-
-        /// Require a specific Proton version as the underlying layer
-        #[arg(short, long)]
-        require_proton: Option<String>,
+        path: Option<PathBuf>,
     },
 
-    /// Uninstall the Steam compatibility tool
+    /// Uninstall the gamescope shim symlink
     Uninstall {
-        /// Steam installation path override
+        /// Path to the symlink (default: ~/.local/bin/gamescope)
         #[arg(short, long)]
-        steam_path: Option<PathBuf>,
+        path: Option<PathBuf>,
     },
 
     /// Search for a game's Steam App ID
@@ -83,15 +70,16 @@ pub enum Commands {
         action: ProtonAction,
     },
 
-    /// Compatibility tool entry point (called by Steam)
-    #[command(hide = true)]
-    Compat {
-        /// The verb passed by Steam (waitforexitandrun, run, etc.)
-        verb: String,
+    /// Gamescope argument management
+    Gamescope {
+        #[command(subcommand)]
+        action: GamescopeAction,
+    },
 
-        /// Remaining arguments from Steam
-        #[arg(trailing_var_arg = true)]
-        args: Vec<String>,
+    /// Manage Steam launch options for games
+    LaunchOptions {
+        #[command(subcommand)]
+        action: LaunchOptionsAction,
     },
 }
 
@@ -129,5 +117,93 @@ pub enum ProtonAction {
         /// Show full paths instead of just names
         #[arg(short, long)]
         paths: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum GamescopeAction {
+    /// Output gamescope arguments for use in Steam launch options
+    ///
+    /// Use in Steam launch options like:
+    /// gamescope $(steam-command-runner gamescope args) -- %command%
+    Args {
+        /// App ID to get gamescope args for (uses SteamAppId env var if not specified)
+        #[arg(short, long)]
+        app_id: Option<u32>,
+    },
+
+    /// Check if gamescope is enabled for a game
+    ///
+    /// Outputs "true" or "false"
+    Enabled {
+        /// App ID to check (uses SteamAppId env var if not specified)
+        #[arg(short, long)]
+        app_id: Option<u32>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum LaunchOptionsAction {
+    /// Set launch options for all installed games
+    SetAll {
+        /// Create a backup of localconfig.vdf before modifying
+        #[arg(short, long, default_value = "true")]
+        backup: bool,
+
+        /// Show what would be changed without actually modifying
+        #[arg(short, long)]
+        dry_run: bool,
+
+        /// Steam user ID (auto-detected if not specified)
+        #[arg(short, long)]
+        user_id: Option<u64>,
+    },
+
+    /// Set launch options for a specific game
+    Set {
+        /// Steam App ID
+        #[arg(short, long)]
+        app_id: u32,
+
+        /// Launch options to set (uses default if not specified)
+        #[arg(short, long)]
+        options: Option<String>,
+
+        /// Steam user ID (auto-detected if not specified)
+        #[arg(short, long)]
+        user_id: Option<u64>,
+    },
+
+    /// Clear launch options for all games
+    ClearAll {
+        /// Create a backup of localconfig.vdf before modifying
+        #[arg(short, long, default_value = "true")]
+        backup: bool,
+
+        /// Only clear launch options set by steam-command-runner
+        #[arg(short, long, default_value = "true")]
+        only_ours: bool,
+
+        /// Steam user ID (auto-detected if not specified)
+        #[arg(short, long)]
+        user_id: Option<u64>,
+    },
+
+    /// Show launch options for a specific game
+    Show {
+        /// Steam App ID
+        #[arg(short, long)]
+        app_id: u32,
+
+        /// Steam user ID (auto-detected if not specified)
+        #[arg(short, long)]
+        user_id: Option<u64>,
+    },
+
+    /// List all games with their current launch options
+    List {
+        /// Steam user ID (auto-detected if not specified)
+        #[arg(short, long)]
+        user_id: Option<u64>,
     },
 }

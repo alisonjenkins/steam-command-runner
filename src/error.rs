@@ -46,4 +46,19 @@ pub enum AppError {
 
     #[error("Hook execution failed: {0}")]
     HookFailed(String),
+
+    #[error("Steam user not found: {0}")]
+    SteamUserNotFound(String),
+
+    #[error("Failed to parse localconfig.vdf: {0}")]
+    LocalConfigParseFailed(String),
+
+    #[error("VDF serialization error: {0}")]
+    VdfSerialize(String),
+
+    #[error("Real gamescope binary not found in PATH")]
+    GamescopeNotFound,
+
+    #[error("Failed to parse gamescope shim arguments: {0}")]
+    GamescopeShimParseFailed(String),
 }

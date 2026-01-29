@@ -1,14 +1,20 @@
 use clap::Parser;
 use std::process::ExitCode;
 use steam_command_runner::cli::commands::{
-    handle_compat, handle_config, handle_install, handle_proton, handle_run, handle_search,
-    handle_uninstall,
+    handle_config, handle_gamescope, handle_install, handle_launch_options, handle_proton,
+    handle_run, handle_search, handle_uninstall,
 };
+use steam_command_runner::shim;
 use steam_command_runner::{AppError, Cli, Commands};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 fn main() -> ExitCode {
+    // Check if invoked as gamescope shim BEFORE clap parsing
+    if shim::is_invoked_as_gamescope() {
+        return shim::handle_gamescope_shim();
+    }
+
     let cli = Cli::parse();
 
     // Initialize logging
@@ -37,17 +43,13 @@ fn run(cli: Cli) -> Result<ExitCode, AppError> {
             Ok(ExitCode::SUCCESS)
         }
 
-        Some(Commands::Install {
-            name,
-            steam_path,
-            require_proton,
-        }) => {
-            handle_install(name, steam_path, require_proton)?;
+        Some(Commands::Install { path }) => {
+            handle_install(path)?;
             Ok(ExitCode::SUCCESS)
         }
 
-        Some(Commands::Uninstall { steam_path }) => {
-            handle_uninstall(steam_path)?;
+        Some(Commands::Uninstall { path }) => {
+            handle_uninstall(path)?;
             Ok(ExitCode::SUCCESS)
         }
 
@@ -66,23 +68,22 @@ fn run(cli: Cli) -> Result<ExitCode, AppError> {
             Ok(ExitCode::SUCCESS)
         }
 
-        Some(Commands::Compat { verb, args }) => {
-            handle_compat(verb, args)
+        Some(Commands::Gamescope { action }) => {
+            handle_gamescope(action)?;
+            Ok(ExitCode::SUCCESS)
+        }
+
+        Some(Commands::LaunchOptions { action }) => {
+            handle_launch_options(action)?;
+            Ok(ExitCode::SUCCESS)
         }
 
         None => {
-            // No subcommand - check if args were passed (legacy mode)
-            if !cli.args.is_empty() {
-                // Legacy mode: treat args as a command to run
-                handle_run(None, cli.args, cli.config)?;
-                Ok(ExitCode::SUCCESS)
-            } else {
-                // No args either - print help
-                use clap::CommandFactory;
-                Cli::command().print_help()?;
-                println!();
-                Ok(ExitCode::SUCCESS)
-            }
+            // No subcommand - print help
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            println!();
+            Ok(ExitCode::SUCCESS)
         }
     }
 }
