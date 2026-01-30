@@ -48,4 +48,22 @@
 ### Shim Functionality
 The `shim` module allows the binary to behave differently based on how it's called (e.g., if renamed or symlinked to `gamescope`), enabling transparent wrapping of other tools.
 
-This allows `steam-command-runner` to "replace" `gamescope` in the execution chain while still calling the real `gamescope` internally, effectively acting as a middleware that can inject arguments based on its own config.
+#### Why use a Shim?
+Normally, to inject dynamic arguments into `gamescope`, you would need to set a complex launch option like:
+`steam-command-runner run --gamescope-args="..." -- %command%`
+
+However, this has significant downsides:
+1.  **Nesting Complexity**: Steam already wraps games in containers (Pressure Vessel) and potentially other compatibility tools (Proton). Adding another "runner" layer can interfere with signal propagation (e.g., stopping the game) or process tree tracking.
+2.  **Launch Option Clutter**: You must update the launch options for *every single game* to point to the runner.
+3.  **Steam Integration**: Steam expects certain behaviors from the immediate child process.
+
+**The Solution**: By symlinking `gamescope` -> `steam-command-runner`, we can use the *standard* launch option:
+`gamescope %command%`
+
+When Steam calls "gamescope", it actually calls our tool. Our tool:
+1.  Detects it is being called as `gamescope`.
+2.  Loads the per-game configuration for the current App ID.
+3.  Constructs the *real* gamescope command line.
+4.  **Replaces itself** (exec) with the real `gamescope` process.
+
+This "exec" step is critical: `steam-command-runner` completely disappears from the process tree. To Steam, it looks like it launched `gamescope` directly. This preserves signal handling, overlay injection, and compatibility tool logic perfectly.

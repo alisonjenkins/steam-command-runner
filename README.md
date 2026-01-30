@@ -4,7 +4,8 @@ A Steam compatibility tool and command wrapper for Linux gaming. It simplifies m
 
 ## Features
 
--   **Gamescope Shim**: Transparently configure Gamescope arguments per-game without changing Steam launch options.
+-   **Gamescope Shim**: Transparently configure Gamescope arguments per-game.
+    *   *Why?* It replaces the `gamescope` binary in the execution chain, preserving Steam Integration (overlay, stop button) and avoiding complex nested launch options.
 -   **Launch Option Manager**: Bulk update or clear Steam launch options for your games.
 -   **Game Search**: Quickly find Steam App IDs.
 -   **Config Management**: robust hierarchical configuration system (Global -> Per-Game).

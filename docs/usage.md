@@ -43,8 +43,13 @@ steam-command-runner search "Cyberpunk"
 
 ## Gamescope Integration
 
-### Method 1: The Shim (Transparent)
+### Method 1: The Shim (Recommended)
 This is the most powerful feature. It allows you to configure gamescope arguments centrally without editing Steam launch options for every game.
+
+**Why use this?**
+-   **Cleaner Steam setup**: You use the standard `gamescope %command%` (or absolute path) for everything.
+-   **Zero overhead**: The tool replaces itself with the real `gamescope`, so there's no extra process running during your game.
+-   **Compatibility**: Avoiding nested "runner" commands ensures Steam Input, Overlay, and Stop functions work as expected.
 
 1.  **Install the Shim**:
     ```bash
@@ -52,9 +57,9 @@ This is the most powerful feature. It allows you to configure gamescope argument
     # Creates ~/.local/bin/gamescope -> steam-command-runner
     ```
 2.  **Set Steam Launch Option**:
-    Use the standard gamescope launch option in Steam. Because `~/.local/bin` is usually early in `PATH`, Steam will call the shim instead of system gamescope.
+    Use the standard gamescope launch option.
     ```
-    gamescope %command%
+    /home/user/.local/bin/gamescope -- %command%
     ```
 3.  **Configure Per-Game**:
     Use the config command to set specific arguments for a game.
@@ -62,21 +67,14 @@ This is the most powerful feature. It allows you to configure gamescope argument
     # Enable gamescope and set arguments for specific game (e.g., 1080p, 144Hz)
     steam-command-runner config edit --app-id 1091500
     ```
-    *Add to the config file:*
-    ```toml
-    gamescope_enabled = true
-    gamescope_args = "-W 1920 -H 1080 -r 144"
-    ```
 
-When you launch the game, the shim intercepts the call, loads your config, allows the original arguments to pass through (or be overridden), and executes the real `gamescope`.
-
-### Method 2: Launch Option Generator
-If you prefer not to use the shim, you can generate arguments dynamically in the Steam launch option.
+### Method 2: Launch Option Generator (Legacy/Alternative)
+You *can* use `steam-command-runner` to generate arguments directly in the launch option string, but this is **not recommended** for general use because it makes launch options messy and harder to maintain.
 
 ```bash
 gamescope $(steam-command-runner gamescope args) -- %command%
 ```
-*(Note: This requires `steam-command-runner` to be in your PATH visible to Steam)*
+*Downside: You must update this string manually if you change how you want arguments generated, and it relies on shell expansion which can be brittle in some Steam environments.*
 
 ## Configuration Management
 
