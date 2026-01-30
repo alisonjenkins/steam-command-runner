@@ -349,11 +349,16 @@ pub fn get_launch_options(config: &LocalConfig, app_id: u32) -> Option<String> {
 /// Check if launch options look like they were set by steam-command-runner
 /// We detect our format: "gamescope -- %command%" or variants with our shim
 pub fn is_our_launch_options(options: &str) -> bool {
-    // Check for our simple format
+    // Check for our simple format (relative or absolute)
     let trimmed = options.trim();
     if trimmed == "gamescope -- %command%" {
         return true;
     }
+    // Check absolute path version
+    if trimmed.ends_with("/gamescope -- %command%") {
+        return true;
+    }
+
     // Also match if it starts with gamescope and ends with %command%
     // and contains steam-command-runner (older format)
     if trimmed.starts_with("gamescope") && trimmed.contains("steam-command-runner") {
@@ -364,14 +369,12 @@ pub fn is_our_launch_options(options: &str) -> bool {
 
 /// Generate the default launch options string
 ///
-/// The gamescope shim reads config to get gamescope args automatically,
-/// so we don't need $(steam-command-runner gamescope args).
-///
-/// If using steam-command-runner as the compatibility tool, %command%
-/// already has pre_command, env vars, etc. applied, so we don't need
-/// steam-command-runner run either.
+/// Returns the absolute path to the local gamescope shim:
+/// ~/.local/bin/gamescope -- %command%
 pub fn generate_default_launch_options() -> String {
-    "gamescope -- %command%".to_string()
+    let home = dirs::home_dir().expect("Could not determine home directory");
+    let path = home.join(".local/bin/gamescope");
+    format!("{} -- %command%", path.display())
 }
 
 #[cfg(test)]
@@ -381,13 +384,15 @@ mod tests {
     #[test]
     fn test_generate_default_launch_options() {
         let options = generate_default_launch_options();
-        assert_eq!(options, "gamescope -- %command%");
+        assert!(options.ends_with("/.local/bin/gamescope -- %command%"));
     }
 
     #[test]
     fn test_is_our_launch_options() {
         // New simple format
         assert!(is_our_launch_options("gamescope -- %command%"));
+        // Absolute path format
+        assert!(is_our_launch_options("/home/user/.local/bin/gamescope -- %command%"));
         // Old format with steam-command-runner
         assert!(is_our_launch_options(
             "gamescope $(steam-command-runner gamescope args) -- steam-command-runner run -- %command%"
