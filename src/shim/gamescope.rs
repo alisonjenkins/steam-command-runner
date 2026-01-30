@@ -141,6 +141,14 @@ pub fn handle_gamescope_shim() -> ExitCode {
     cmd.args(&all_gamescope_args);
     log_to_file(&format!("Executing: {:?} args: {:?}", real_gamescope, all_gamescope_args), debug_enabled);
 
+    // Apply environment variables from config
+    if let Some(c) = &config {
+        for (key, value) in &c.env {
+            log_to_file(&format!("Setting env: {}={}", key, value), debug_enabled);
+            cmd.env(key, value);
+        }
+    }
+
     // We CANNOT successfully set LD_PRELOAD on the gamescope process itself
     // because gamescope has capabilities (cap_sys_nice) which causes the OS to strip insecure env vars.
     // Instead, we must inject it into the INNER command using 'env'.
@@ -167,6 +175,17 @@ pub fn handle_gamescope_shim() -> ExitCode {
             log_to_file(&format!("Injecting LD_PRELOAD via inner 'env' wrapper: {}", ld_preload), debug_enabled);
             cmd.arg("env");
             cmd.arg(format!("LD_PRELOAD={}", ld_preload));
+        }
+
+        // Inject pre_command (e.g., mangohud) into inner command
+        // This ensures it runs AFTER gamescope has started, avoiding capability stripping
+        if let Some(c) = &config {
+            if let Some(pre_cmd) = c.effective_pre_command() {
+                log_to_file(&format!("Injecting pre_command: {}", pre_cmd), debug_enabled);
+                if let Some(pre_args) = shlex::split(pre_cmd) {
+                    cmd.args(pre_args);
+                }
+            }
         }
 
         cmd.args(&command);
