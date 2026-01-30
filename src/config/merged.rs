@@ -54,6 +54,9 @@ pub struct MergedConfig {
 
     /// Whether shim debug logging is enabled
     pub shim_debug: bool,
+    
+    /// Arguments to append to the game command
+    pub game_args: Option<String>,
 }
 
 impl MergedConfig {
@@ -147,6 +150,7 @@ impl MergedConfig {
             gamescope_args,
             gamescope_enabled,
             shim_debug: global.shim_debug,
+            game_args: game.game_args.or(global.game_args),
         }
     }
 

@@ -189,6 +189,16 @@ pub fn handle_gamescope_shim() -> ExitCode {
         }
 
         cmd.args(&command);
+
+        // Append explicit game_args from config (e.g. --skip-intro)
+        if let Some(c) = &config {
+            if let Some(args_str) = &c.game_args {
+                log_to_file(&format!("Appending game_args: {}", args_str), debug_enabled);
+                if let Some(extra_args) = shlex::split(args_str) {
+                    cmd.args(extra_args);
+                }
+            }
+        }
     }
 
     // exec() replaces the current process - this never returns on success

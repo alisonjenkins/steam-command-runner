@@ -28,6 +28,10 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub gamescope: GamescopeConfig,
 
+    /// Arguments to append to the game command
+    #[serde(default)]
+    pub game_args: Option<String>,
+
     /// Enable debug logging for the shim (default: false)
     #[serde(default)]
     pub shim_debug: bool,
