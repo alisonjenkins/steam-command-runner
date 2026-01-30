@@ -11,32 +11,49 @@ A Steam compatibility tool and command wrapper for Linux gaming. It simplifies m
 
 ## Quick Start
 
-### Installation (Nix)
+## Installation
+
+### Option 1: Binary Release (Easiest)
+1. Go to the [Releases Page](https://github.com/alisonjenkins/steam-command-runner/releases).
+2. Download the zip for your architecture (`x86_64` or `arm64`).
+3. Extract the binary and place it in your PATH (ideally `~/.local/bin`).
+   ```bash
+   unzip steam-command-runner-linux-x86_64.zip
+   mv steam-command-runner ~/.local/bin/
+   ```
+
+### Option 2: Nix Flake
+Add to your `flake.nix` inputs:
+```nix
+inputs.steam-command-runner.url = "github:alisonjenkins/steam-command-runner";
+```
+Then add package `inputs.steam-command-runner.packages.${system}.default` to your system configuration.
+
+Or run directly:
 ```bash
-nix profile install github:alisonjenkins/steam-command-runner
+nix run github:alisonjenkins/steam-command-runner -- help
 ```
 
-### Installation (Cargo)
+### Option 3: Manual Build
+Clone and build with Cargo:
 ```bash
-cargo install --path .
+cargo build --release
+cp target/release/steam-command-runner ~/.local/bin/
 ```
 
-### Basic Usage
+## Quick Start
+1. **Install the Shim**:
+   ```bash
+   steam-command-runner install
+   ```
+   This creates `~/.local/bin/gamescope` symlinked to the tool.
 
-**Search for a game:**
-```bash
-steam-command-runner search "Elden Ring"
-```
-
-**Install the Gamescope Shim:**
-```bash
-steam-command-runner install
-```
-
-**Configure Gamescope for a specific game:**
-```bash
-steam-command-runner config edit --app-id 1245620
-```
+2. **Configure Steam**:
+   Set your game's launch options to:
+   ```bash
+   /home/youruser/.local/bin/gamescope -- %command%
+   ```
+   *Note: Use `steam-command-runner launch-options set-all` to automate this!*
 
 ## Documentation
 
