@@ -88,6 +88,72 @@ pub fn get_localconfig_path(user_id: u64) -> Result<PathBuf, AppError> {
     Ok(config_path)
 }
 
+/// Get the path to loginusers.vdf
+pub fn get_login_users_path() -> Result<PathBuf, AppError> {
+    let steam_root = get_steam_root().ok_or_else(|| {
+        AppError::SteamUserNotFound("Could not find Steam installation".to_string())
+    })?;
+
+    let config_path = steam_root.join("config").join("loginusers.vdf");
+
+    if !config_path.exists() {
+        return Err(AppError::SteamUserNotFound(format!(
+            "loginusers.vdf not found: {}",
+            config_path.display()
+        )));
+    }
+
+    Ok(config_path)
+}
+
+/// Get a map of Account ID (32-bit) to Persona Name
+pub fn get_user_names() -> Result<std::collections::HashMap<u64, String>, AppError> {
+    let path = get_login_users_path()?;
+    let content = fs::read_to_string(&path)?;
+    
+    let mut names = std::collections::HashMap::new();
+    let mut current_steam_id64 = String::new();
+    
+    for line in content.lines() {
+        let trimmed = line.trim();
+        
+        // Very basic VDF parsing sufficient for this file structure
+        // We look for quoted keys that look like steam IDs, and "PersonaName" keys
+        
+        if trimmed.starts_with('"') {
+            let parts: Vec<&str> = trimmed.split('"').filter(|s| !s.trim().is_empty()).collect();
+            
+            if parts.len() == 1 {
+                // Potential SteamID key (section start)
+                let key = parts[0];
+                if key.len() > 10 && key.chars().all(|c| c.is_numeric()) {
+                    current_steam_id64 = key.to_string();
+                }
+            } else if parts.len() >= 2 {
+                // Key-Value pair
+                let key = parts[0];
+                let value = parts[1];
+                
+                if key == "PersonaName" && !current_steam_id64.is_empty() {
+                    if let Ok(steam_id64) = current_steam_id64.parse::<u64>() {
+                        // Convert to 32-bit Account ID
+                        // SteamID64 = AccountID * 2 + 76561197960265728 + Y
+                        // But usually simpler conversion is just modifying the high bits or subtracting base
+                        // The standard base is 76561197960265728
+                        if steam_id64 > 76561197960265728 {
+                            let account_id = steam_id64 - 76561197960265728;
+                            debug!("Found user: {} -> {}", account_id, value);
+                            names.insert(account_id, value.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(names)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

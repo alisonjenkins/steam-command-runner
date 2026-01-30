@@ -44,9 +44,16 @@ fn resolve_user_id(user_id: Option<u64>) -> Result<u64, AppError> {
             if user_ids.len() == 1 {
                 Ok(user_ids[0])
             } else {
+                // Try to get user names for better display
+                let user_names = crate::steam::userdata::get_user_names().unwrap_or_default();
+                
                 println!("Multiple Steam users found:");
                 for id in &user_ids {
-                    println!("  {}", id);
+                    if let Some(name) = user_names.get(id) {
+                        println!("  {} ({})", id, name);
+                    } else {
+                        println!("  {}", id);
+                    }
                 }
                 Err(AppError::SteamUserNotFound(
                     "Multiple users found. Please specify --user-id".to_string(),
