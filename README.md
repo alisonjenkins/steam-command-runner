@@ -16,10 +16,25 @@ A Steam compatibility tool and command wrapper for Linux gaming. It simplifies m
 ### Option 1: Binary Release (Easiest)
 1. Go to the [Releases Page](https://github.com/alisonjenkins/steam-command-runner/releases).
 2. Download the zip for your architecture (`x86_64` or `arm64`).
-3. Extract the binary and place it in your PATH (ideally `~/.local/bin`).
+3. Extract the binary and place it in `~/.local/bin` (create it if it doesn't exist):
    ```bash
+   mkdir -p ~/.local/bin
    unzip steam-command-runner-linux-x86_64.zip
    mv steam-command-runner ~/.local/bin/
+   ```
+
+4. **Important**: Ensure `~/.local/bin` is in your `PATH`.
+   Check if it's already there:
+   ```bash
+   echo $PATH | grep "$HOME/.local/bin"
+   ```
+   If not, add this to your shell config file (e.g., `~/.bashrc`, `~/.zshrc`):
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+   Then reload your shell:
+   ```bash
+   source ~/.bashrc  # or ~/.zshrc
    ```
 
 ### Option 2: Nix Flake
