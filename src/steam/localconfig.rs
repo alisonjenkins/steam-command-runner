@@ -186,9 +186,9 @@ impl LocalConfig {
         }
 
         // If we didn't find the app at all, we need to add it
-        if !in_target_app && options.is_some() {
+        if let (false, Some(options)) = (in_target_app, options) {
             // Find the apps section and add the new entry
-            self.content = add_app_entry(&new_lines.join("\n"), app_id, options.unwrap());
+            self.content = add_app_entry(&new_lines.join("\n"), app_id, options);
         } else {
             self.content = new_lines.join("\n");
         }
