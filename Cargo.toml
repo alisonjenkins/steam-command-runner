@@ -39,7 +39,7 @@ shlex = "2"
 thiserror = "2"
 
 [dev-dependencies]
-cucumber = "0.21"
+cucumber = "0.23"
 futures = "0.3"
 tempfile = "3"
 
