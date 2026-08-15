@@ -244,7 +244,7 @@ fn build_ld_preload_with_overlay(debug: bool) -> Option<String> {
             Some(existing)
         } else {
             let new_preload = format!("{}:{}", overlay_paths, existing);
-            log_to_file(&format!("Prepending overlay to existing LD_PRELOAD"), debug);
+            log_to_file("Prepending overlay to existing LD_PRELOAD", debug);
             Some(new_preload)
         }
     } else {
