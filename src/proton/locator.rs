@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info};
 
 /// Locate a Proton installation
@@ -132,7 +132,7 @@ fn get_steam_library_paths() -> Vec<PathBuf> {
 }
 
 /// Check if a path contains a valid Proton installation
-fn is_valid_proton(path: &PathBuf) -> bool {
+fn is_valid_proton(path: &Path) -> bool {
     path.is_dir() && path.join("proton").exists()
 }
 
