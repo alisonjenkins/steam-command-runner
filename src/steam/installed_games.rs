@@ -13,7 +13,7 @@ pub struct InstalledGame {
     pub install_dir: String,
 }
 
-/// Parse a VDF key-value line like: "key"		"value"
+/// Parse a VDF key-value line like: "key"        "value"
 fn parse_vdf_key_value(line: &str) -> Option<(&str, &str)> {
     let line = line.trim();
     if !line.starts_with('"') {
