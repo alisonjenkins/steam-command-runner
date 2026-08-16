@@ -199,6 +199,14 @@ impl<'a> ProtonRunner<'a> {
                     full_command.push(format!("LD_PRELOAD={}", ld_preload));
                 }
 
+                // Game-only variables go here, past the `--`, so gamescope
+                // itself never inherits them
+                let inner_env = self.config.inner_env_assignments();
+                if !inner_env.is_empty() {
+                    log_to_file(&format!("Adding inner_env to inner command: {:?}", inner_env));
+                    full_command.extend(inner_env);
+                }
+
                 using_gamescope = true;
             }
         }
@@ -243,6 +251,15 @@ impl<'a> ProtonRunner<'a> {
         for (key, value) in &self.config.env {
             debug!("Setting env: {}={}", key, value);
             process.env(key, value);
+        }
+
+        // Without a gamescope process in between, the process we exec leads
+        // straight to the game, so inner_env belongs on it directly
+        if !using_gamescope {
+            for (key, value) in &self.config.inner_env {
+                debug!("Setting inner env: {}={}", key, value);
+                process.env(key, value);
+            }
         }
 
         // Set Steam overlay environment variables on the process itself

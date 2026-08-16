@@ -86,6 +86,14 @@ impl<'a> NativeRunner<'a> {
                     gs_command.push(format!("LD_PRELOAD={}", ld_preload));
                 }
 
+                // Game-only variables go here, past the `--`, so gamescope
+                // itself never inherits them
+                let inner_env = self.config.inner_env_assignments();
+                if !inner_env.is_empty() {
+                    debug!("Adding inner_env to gamescope inner command: {:?}", inner_env);
+                    gs_command.extend(inner_env);
+                }
+
                 gs_command.extend(command);
                 command = gs_command;
                 using_gamescope = true;
@@ -125,6 +133,15 @@ impl<'a> NativeRunner<'a> {
         for (key, value) in &self.config.env {
             debug!("Setting env: {}={}", key, value);
             process.env(key, value);
+        }
+
+        // Without a gamescope process in between, the process we exec IS the
+        // game, so inner_env belongs on it directly
+        if !using_gamescope {
+            for (key, value) in &self.config.inner_env {
+                debug!("Setting inner env: {}={}", key, value);
+                process.env(key, value);
+            }
         }
 
         // Set Steam overlay environment variables on the process itself
