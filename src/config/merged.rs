@@ -25,8 +25,11 @@ pub struct MergedConfig {
     /// Pre-command to prepend
     pub pre_command: Option<String>,
 
-    /// Environment variables to set
+    /// Environment variables to set on the process we exec
     pub env: HashMap<String, String>,
+
+    /// Environment variables for the inner game command only, never the compositor
+    pub inner_env: HashMap<String, String>,
 
     /// Additional launch arguments
     pub launch_args: Vec<String>,
@@ -107,6 +110,10 @@ impl MergedConfig {
         let mut env = global.env.clone();
         env.extend(game.env);
 
+        // Same for inner-command env (game overrides global)
+        let mut inner_env = global.inner_env.clone();
+        inner_env.extend(game.inner_env);
+
         // Handle pre_command with "inherit" keyword
         let pre_command = match &game.pre_command {
             Some(cmd) if cmd.contains("inherit") => {
@@ -141,6 +148,7 @@ impl MergedConfig {
             proton: game.proton.or(global.default_proton),
             pre_command,
             env,
+            inner_env,
             launch_args: game.launch_args,
             pre_launch_hook,
             post_exit_hook,
@@ -154,6 +162,19 @@ impl MergedConfig {
         }
     }
 
+    /// Build the `KEY=VALUE` assignments for the inner command's `env` wrapper
+    ///
+    /// Sorted by key so the emitted command line is deterministic.
+    pub fn inner_env_assignments(&self) -> Vec<String> {
+        let mut assignments: Vec<String> = self
+            .inner_env
+            .iter()
+            .map(|(key, value)| format!("{}={}", key, value))
+            .collect();
+        assignments.sort();
+        assignments
+    }
+
     /// Get the effective pre_command considering Gamescope session
     pub fn effective_pre_command(&self) -> Option<&str> {
         if self.is_gamescope_session {
@@ -165,6 +186,74 @@ impl MergedConfig {
         } else {
             self.pre_command.as_deref()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn test_inner_env_merges_game_over_global() {
+        let global = GlobalConfig {
+            inner_env: env_map(&[("MANGOHUD", "1"), ("ENABLE_VKBASALT", "1")]),
+            ..Default::default()
+        };
+        let game = GameConfig {
+            inner_env: env_map(&[("MANGOHUD", "0")]),
+            ..Default::default()
+        };
+
+        let merged = MergedConfig::merge(global, Some(game), false, None);
+
+        assert_eq!(merged.inner_env.get("MANGOHUD").map(String::as_str), Some("0"));
+        assert_eq!(
+            merged.inner_env.get("ENABLE_VKBASALT").map(String::as_str),
+            Some("1")
+        );
+    }
+
+    #[test]
+    fn test_inner_env_is_kept_out_of_env() {
+        let global = GlobalConfig {
+            env: env_map(&[("DXVK_ASYNC", "1")]),
+            inner_env: env_map(&[("MANGOHUD", "1")]),
+            ..Default::default()
+        };
+
+        let merged = MergedConfig::merge(global, None, false, None);
+
+        assert!(!merged.env.contains_key("MANGOHUD"));
+        assert!(!merged.inner_env.contains_key("DXVK_ASYNC"));
+    }
+
+    #[test]
+    fn test_inner_env_assignments_are_sorted() {
+        let global = GlobalConfig {
+            inner_env: env_map(&[("MANGOHUD", "1"), ("ENABLE_VKBASALT", "1"), ("A", "b")]),
+            ..Default::default()
+        };
+
+        let merged = MergedConfig::merge(global, None, false, None);
+
+        assert_eq!(
+            merged.inner_env_assignments(),
+            vec!["A=b", "ENABLE_VKBASALT=1", "MANGOHUD=1"]
+        );
+    }
+
+    #[test]
+    fn test_inner_env_assignments_empty_by_default() {
+        let merged = MergedConfig::merge(GlobalConfig::default(), None, false, None);
+
+        assert!(merged.inner_env_assignments().is_empty());
     }
 }
 

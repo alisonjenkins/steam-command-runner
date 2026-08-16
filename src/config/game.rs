@@ -26,6 +26,10 @@ pub struct GameConfig {
     #[serde(default)]
     pub env: HashMap<String, String>,
 
+    /// Per-game inner-command environment variables (see `GlobalConfig::inner_env`)
+    #[serde(default)]
+    pub inner_env: HashMap<String, String>,
+
     /// Game-specific launch arguments
     #[serde(default)]
     pub launch_args: Vec<String>,

@@ -17,8 +17,22 @@ pub struct GlobalConfig {
     pub default_mode: ExecutionMode,
 
     /// Global environment variables applied to all games
+    ///
+    /// These land on the process we exec, which is the *gamescope* process when
+    /// gamescope is in play — gamescope inherits them too. Use `inner_env` for
+    /// anything that must not reach the compositor.
     #[serde(default)]
     pub env: HashMap<String, String>,
+
+    /// Environment variables applied to the inner game command only
+    ///
+    /// Emitted as `KEY=VALUE` assignments to the `env` wrapper after gamescope's
+    /// `--`, so gamescope itself never sees them. MANGOHUD is the canonical case:
+    /// MangoHud's implicit Vulkan layer keys off `MANGOHUD=1`, and letting
+    /// gamescope inherit it loads the overlay into gamescope's own Vulkan
+    /// instance, which segfaults at exit in `CVulkanDevice::~CVulkanDevice`.
+    #[serde(default)]
+    pub inner_env: HashMap<String, String>,
 
     /// Hook configuration
     #[serde(default)]
