@@ -145,6 +145,15 @@ pub fn handle_gamescope_shim() -> ExitCode {
     if let Some(c) = &config {
         for (key, value) in &c.env {
             log_to_file(&format!("Setting env: {}={}", key, value), debug_enabled);
+            if is_compositor_hostile(key) {
+                let warning = format!(
+                    "Warning: {} is set in [env], so gamescope inherits it. \
+                     Move it to [inner_env] to keep it out of the compositor.",
+                    key
+                );
+                log_to_file(&warning, debug_enabled);
+                eprintln!("{}", warning);
+            }
             cmd.env(key, value);
         }
     }
@@ -170,11 +179,19 @@ pub fn handle_gamescope_shim() -> ExitCode {
     if !command.is_empty() {
         cmd.arg("--");
         
-        // Inject Steam Overlay via env wrapper in inner command
-        if let Some(ld_preload) = build_ld_preload_with_overlay(debug_enabled) {
-            log_to_file(&format!("Injecting LD_PRELOAD via inner 'env' wrapper: {}", ld_preload), debug_enabled);
-            cmd.arg("env");
-            cmd.arg(format!("LD_PRELOAD={}", ld_preload));
+        // Inject the Steam overlay's LD_PRELOAD and any inner_env vars via an
+        // 'env' wrapper on the inner command
+        let inner_assignments = config
+            .as_ref()
+            .map(|c| c.inner_env_assignments())
+            .unwrap_or_default();
+        let env_wrapper = build_inner_env_wrapper(
+            build_ld_preload_with_overlay(debug_enabled),
+            inner_assignments,
+        );
+        if !env_wrapper.is_empty() {
+            log_to_file(&format!("Injecting inner 'env' wrapper: {:?}", env_wrapper), debug_enabled);
+            cmd.args(&env_wrapper);
         }
 
         // Inject pre_command (e.g., mangohud) into inner command
@@ -206,6 +223,39 @@ pub fn handle_gamescope_shim() -> ExitCode {
     log_to_file(&format!("Error: Failed to exec gamescope: {}", err), debug_enabled);
     eprintln!("Error: Failed to exec gamescope: {}", err);
     ExitCode::FAILURE
+}
+
+/// Variables that break gamescope if the compositor process inherits them
+///
+/// MangoHud and vkBasalt are loaded by implicit Vulkan layers keyed off these
+/// variables, so gamescope picks up an overlay in its own Vulkan instance —
+/// useless (the visible HUD comes from the game's instance) and, for MangoHud,
+/// fatal at exit.
+const COMPOSITOR_HOSTILE_VARS: &[&str] = &["MANGOHUD", "MANGOHUD_CONFIG", "ENABLE_VKBASALT"];
+
+fn is_compositor_hostile(key: &str) -> bool {
+    COMPOSITOR_HOSTILE_VARS.contains(&key)
+}
+
+/// Build the `env KEY=VALUE ...` prefix for the inner command
+///
+/// Returns an empty vector when there is nothing to set, so the caller can skip
+/// the wrapper entirely.
+fn build_inner_env_wrapper(ld_preload: Option<String>, inner_env: Vec<String>) -> Vec<String> {
+    let mut assignments = Vec::new();
+
+    if let Some(ld_preload) = ld_preload {
+        assignments.push(format!("LD_PRELOAD={}", ld_preload));
+    }
+    assignments.extend(inner_env);
+
+    if assignments.is_empty() {
+        return Vec::new();
+    }
+
+    let mut wrapper = vec!["env".to_string()];
+    wrapper.extend(assignments);
+    wrapper
 }
 
 /// Get the Steam overlay library paths for LD_PRELOAD
@@ -304,6 +354,35 @@ mod tests {
 
         assert_eq!(gs_args, vec!["-f", "--fullscreen"]);
         assert!(cmd.is_empty());
+    }
+
+    #[test]
+    fn test_inner_env_wrapper_combines_preload_and_inner_env() {
+        let wrapper = build_inner_env_wrapper(
+            Some("/steam/overlay.so".to_string()),
+            vec!["MANGOHUD=1".to_string()],
+        );
+
+        assert_eq!(wrapper, vec!["env", "LD_PRELOAD=/steam/overlay.so", "MANGOHUD=1"]);
+    }
+
+    #[test]
+    fn test_inner_env_wrapper_without_preload() {
+        let wrapper = build_inner_env_wrapper(None, vec!["MANGOHUD=1".to_string()]);
+
+        assert_eq!(wrapper, vec!["env", "MANGOHUD=1"]);
+    }
+
+    #[test]
+    fn test_inner_env_wrapper_empty_when_nothing_to_set() {
+        assert!(build_inner_env_wrapper(None, Vec::new()).is_empty());
+    }
+
+    #[test]
+    fn test_compositor_hostile_vars() {
+        assert!(is_compositor_hostile("MANGOHUD"));
+        assert!(is_compositor_hostile("ENABLE_VKBASALT"));
+        assert!(!is_compositor_hostile("DXVK_ASYNC"));
     }
 
     #[test]
