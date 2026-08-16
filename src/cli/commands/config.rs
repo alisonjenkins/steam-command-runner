@@ -58,9 +58,19 @@ fn init_config() -> Result<(), AppError> {
 default_mode = "auto"
 
 # Global environment variables applied to all games
+# NOTE: these are set on the process we exec, which is gamescope itself when
+# gamescope wraps the game — gamescope inherits them. Use [inner_env] for
+# anything that must not reach the compositor.
 [env]
-# MANGOHUD = "1"
 # DXVK_ASYNC = "1"
+
+# Environment variables for the game only, never the compositor
+# Emitted as `env KEY=VALUE` on the inner command, past gamescope's `--`.
+# MANGOHUD belongs here: in [env] its implicit Vulkan layer loads into
+# gamescope's own instance and segfaults gamescope at exit.
+[inner_env]
+# MANGOHUD = "1"
+# ENABLE_VKBASALT = "1"
 
 # Gamescope-specific settings
 [gamescope]
@@ -140,8 +150,12 @@ fn edit_config(app_id: Option<u32>, name: Option<String>) -> Result<(), AppError
 # Disable gamescope for this game (e.g., for Steam Input compatibility)
 # gamescope_enabled = false
 
-# Game-specific environment variables
+# Game-specific environment variables (gamescope inherits these)
 [env]
+# DXVK_ASYNC = "1"
+
+# Game-specific variables for the game only, never the compositor
+[inner_env]
 # MANGOHUD = "1"
 
 # Game-specific hooks

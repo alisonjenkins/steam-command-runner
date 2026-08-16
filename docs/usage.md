@@ -83,6 +83,32 @@ Configuration is stored in `~/.config/steam-command-runner/`.
 -   **Global Config**: Applies to all games.
 -   **Per-Game Config**: Overrides global settings for a specific App ID.
 
+### Environment variables: `[env]` vs `[inner_env]`
+
+Both tables set environment variables, but at different points in the launch chain:
+
+-   **`[env]`**: set on the process the runner execs. When gamescope is in play that
+    process *is* gamescope, so gamescope inherits these too. Use it for variables the
+    compositor needs (or doesn't mind).
+-   **`[inner_env]`**: emitted as `KEY=VALUE` assignments to the `env` wrapper on the
+    inner command, past gamescope's `--`. Gamescope never sees them. Without gamescope
+    they are set directly on the game process, so behaviour is the same either way.
+
+Put `MANGOHUD`, `MANGOHUD_CONFIG` and `ENABLE_VKBASALT` in `[inner_env]`. Those load
+implicit Vulkan layers, and in `[env]` the layer is loaded into gamescope's own Vulkan
+instance: the HUD you see still comes from the game, and gamescope segfaults at exit in
+`CVulkanDevice::~CVulkanDevice` when MangoHud's overlay data has already been torn down.
+The shim prints a warning if it finds one of them in `[env]`.
+
+```toml
+# Global config
+[env]
+DXVK_ASYNC = "1"        # gamescope may inherit this harmlessly
+
+[inner_env]
+MANGOHUD = "1"          # game only — never gamescope
+```
+
 ### Commands
 
 -   **Show Config**: `steam-command-runner config show [--app-id <ID>]`
