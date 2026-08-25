@@ -129,6 +129,22 @@ pub fn handle_gamescope_shim() -> ExitCode {
             &format!("Stream target active: {:?}, rewriting size and output", target),
             debug_enabled,
         );
+
+        // gamescope resolves --prefer-output when it starts, so launching
+        // before the output exists puts the game on the desktop and nothing
+        // moves it afterwards. The host creates the output when a client
+        // connects, well before a game is normally launched; this only covers
+        // a launch that races it.
+        if !stream_target::wait_for_output(&target.output) {
+            log_to_file(
+                &format!(
+                    "Output {} did not appear; launching anyway at its size",
+                    target.output
+                ),
+                debug_enabled,
+            );
+        }
+
         all_gamescope_args = stream_target::apply(all_gamescope_args, &target);
     }
 

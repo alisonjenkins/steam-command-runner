@@ -18,6 +18,8 @@
 
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
+use std::time::{Duration, Instant};
 
 /// Where a streaming client wants the game rendered.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +84,63 @@ impl StreamTarget {
             refresh,
         })
     }
+}
+
+/// How long to wait for the target output to exist before launching anyway.
+///
+/// The host-side watcher creates it when a client connects, which is normally
+/// well before a game is launched, so this only covers the case where a launch
+/// races it. Launching anyway after the wait is deliberate: a game that starts
+/// on the wrong display is a poor outcome, but a game that never starts is a
+/// worse one.
+fn wait_timeout() -> Duration {
+    let secs = env::var("STEAM_COMMAND_RUNNER_STREAM_WAIT")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(20);
+    Duration::from_secs(secs)
+}
+
+/// Is the named output present in niri right now?
+///
+/// `None` means the question could not be answered — niri missing, IPC not
+/// responding — which is treated as "do not wait", since blocking a game
+/// launch on an unanswerable question would be worse than launching.
+fn output_present(name: &str) -> Option<bool> {
+    let output = Command::new("niri")
+        .args(["msg", "--json", "outputs"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    Some(parsed.get(name).is_some())
+}
+
+/// Block until the target output exists, or the wait runs out.
+///
+/// Returns whether it is there. gamescope resolves `--prefer-output` when it
+/// starts, so launching before the output exists puts the game on the desktop
+/// and no later change moves it — the whole point of waiting.
+pub fn wait_for_output(name: &str) -> bool {
+    if output_present(name) != Some(false) {
+        // Present, or unanswerable. Either way there is nothing to wait for.
+        return true;
+    }
+
+    let deadline = Instant::now() + wait_timeout();
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+        match output_present(name) {
+            Some(true) => return true,
+            // Stop waiting on an unanswerable question rather than burn the
+            // whole timeout on it.
+            None => return false,
+            Some(false) => {}
+        }
+    }
+    false
 }
 
 /// gamescope flags that take a value and that a stream target replaces.
@@ -263,6 +322,19 @@ mod tests {
         let out = apply(args("-r 120 -b"), &t);
         assert!(!out.iter().any(|a| a == "-r"));
         assert!(!out.iter().any(|a| a == "120"));
+    }
+
+    #[test]
+    fn waiting_is_skipped_when_niri_cannot_answer() {
+        // Blocking a game launch on an unanswerable question would be worse
+        // than launching. With no niri on PATH the probe cannot answer, so
+        // this must return promptly rather than burn the timeout.
+        let start = std::time::Instant::now();
+        let present = wait_for_output("definitely-not-an-output");
+        assert!(start.elapsed() < Duration::from_secs(5));
+        // Either it answered "not present" and gave up fast, or it could not
+        // answer and said so; both are non-blocking.
+        let _ = present;
     }
 
     #[test]
