@@ -1,4 +1,5 @@
 use crate::config::MergedConfig;
+use crate::shim::stream_target::{self, StreamTarget};
 use std::env;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
@@ -117,6 +118,19 @@ pub fn handle_gamescope_shim() -> ExitCode {
 
     let mut all_gamescope_args = config_gamescope_args;
     all_gamescope_args.extend(cli_gamescope_args);
+
+    // A game launched while a client is streaming has to render at that
+    // client's resolution. gamescope fixes its render size at startup, so a
+    // game started with the desktop's geometry is only scaled into the
+    // smaller output afterwards and stays letterboxed. This is the one point
+    // in Steam's launch chain that sees the arguments in time.
+    if let Some(target) = StreamTarget::detect() {
+        log_to_file(
+            &format!("Stream target active: {:?}, rewriting size and output", target),
+            debug_enabled,
+        );
+        all_gamescope_args = stream_target::apply(all_gamescope_args, &target);
+    }
 
     // Find the real gamescope binary
     let real_gamescope = match find_real_gamescope() {
