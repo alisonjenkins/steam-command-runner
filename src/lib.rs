@@ -7,6 +7,7 @@ pub mod runner;
 pub mod shim;
 pub mod steam;
 pub mod steam_api;
+pub mod uhk;
 
 pub use cli::{Cli, Commands, ConfigAction};
 pub use config::{ConfigError, ExecutionMode, GlobalConfig, MergedConfig};

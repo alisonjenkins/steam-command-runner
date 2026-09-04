@@ -38,6 +38,9 @@ shlex = "2"
 # Error handling
 thiserror = "2"
 
+# Raw USB HID (Ultimate Hacking Keyboard keymap switching)
+hidapi = "2"
+
 [dev-dependencies]
 cucumber = "0.23"
 futures = "0.3"
