@@ -1,11 +1,12 @@
 use crate::config::MergedConfig;
+use crate::hooks;
 use crate::shim::stream_target::{self, StreamTarget};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::io::Write;
 
 /// Check if the current binary was invoked as "gamescope"
 pub fn is_invoked_as_gamescope() -> bool {
@@ -45,9 +46,7 @@ fn parse_gamescope_args(args: Vec<String>) -> (Vec<String>, Vec<String>) {
 
 /// Get the Steam App ID from environment
 fn get_app_id() -> Option<u32> {
-    env::var("SteamAppId")
-        .ok()
-        .and_then(|s| s.parse().ok())
+    env::var("SteamAppId").ok().and_then(|s| s.parse().ok())
 }
 
 /// Find the real gamescope binary, excluding ourselves
@@ -100,12 +99,23 @@ pub fn handle_gamescope_shim() -> ExitCode {
     log_to_file("Shim started", debug_enabled);
     let args: Vec<String> = std::env::args().collect();
     log_to_file(&format!("Args: {:?}", args), debug_enabled);
+
+    if let Some(hook) = config.as_ref().and_then(|c| c.pre_launch_hook.as_ref()) {
+        log_to_file(
+            &format!("Running pre_launch hook: {}", hook.command),
+            debug_enabled,
+        );
+        if let Err(e) = hooks::execute(hook) {
+            log_to_file(&format!("pre_launch hook failed: {}", e), debug_enabled);
+            eprintln!("pre_launch hook failed: {}", e);
+        }
+    }
     let (cli_gamescope_args, command) = parse_gamescope_args(args);
 
     // Get gamescope args from config
     let config_gamescope_args = if let Some(c) = &config {
         if c.gamescope_enabled {
-             match &c.gamescope_args {
+            match &c.gamescope_args {
                 Some(args_str) => shlex::split(args_str).unwrap_or_default(),
                 None => Vec::new(),
             }
@@ -126,7 +136,10 @@ pub fn handle_gamescope_shim() -> ExitCode {
     // in Steam's launch chain that sees the arguments in time.
     if let Some(target) = StreamTarget::detect() {
         log_to_file(
-            &format!("Stream target active: {:?}, rewriting size and output", target),
+            &format!(
+                "Stream target active: {:?}, rewriting size and output",
+                target
+            ),
             debug_enabled,
         );
 
@@ -151,11 +164,17 @@ pub fn handle_gamescope_shim() -> ExitCode {
     // Find the real gamescope binary
     let real_gamescope = match find_real_gamescope() {
         Some(path) => {
-            log_to_file(&format!("Found real gamescope at: {:?}", path), debug_enabled);
+            log_to_file(
+                &format!("Found real gamescope at: {:?}", path),
+                debug_enabled,
+            );
             path
-        },
+        }
         None => {
-            log_to_file("Error: Real gamescope binary not found in PATH", debug_enabled);
+            log_to_file(
+                "Error: Real gamescope binary not found in PATH",
+                debug_enabled,
+            );
             eprintln!("Error: Real gamescope binary not found in PATH");
             eprintln!("Make sure gamescope is installed and the steam-command-runner symlink");
             eprintln!("is not shadowing the real gamescope binary.");
@@ -163,13 +182,15 @@ pub fn handle_gamescope_shim() -> ExitCode {
         }
     };
 
-    // Use exec to replace the current process
-    // This preserves all environment variables set by Steam (including LIBEI_SOCKET, LD_PRELOAD)
-    use std::os::unix::process::CommandExt;
-
     let mut cmd = std::process::Command::new(&real_gamescope);
     cmd.args(&all_gamescope_args);
-    log_to_file(&format!("Executing: {:?} args: {:?}", real_gamescope, all_gamescope_args), debug_enabled);
+    log_to_file(
+        &format!(
+            "Executing: {:?} args: {:?}",
+            real_gamescope, all_gamescope_args
+        ),
+        debug_enabled,
+    );
 
     // Apply environment variables from config
     if let Some(c) = &config {
@@ -193,9 +214,12 @@ pub fn handle_gamescope_shim() -> ExitCode {
     // Instead, we must inject it into the INNER command using 'env'.
 
     // Set Gamescope Overlay variables (These are likely safe from stripping or gamescope might use them)
-    log_to_file("Setting ENABLE_VK_LAYER_VALVE_steam_overlay_1=1", debug_enabled);
+    log_to_file(
+        "Setting ENABLE_VK_LAYER_VALVE_steam_overlay_1=1",
+        debug_enabled,
+    );
     cmd.env("ENABLE_VK_LAYER_VALVE_steam_overlay_1", "1");
-    
+
     log_to_file("Setting ENABLE_GAMESCOPE_WSI=1", debug_enabled);
     cmd.env("ENABLE_GAMESCOPE_WSI", "1");
 
@@ -208,7 +232,7 @@ pub fn handle_gamescope_shim() -> ExitCode {
 
     if !command.is_empty() {
         cmd.arg("--");
-        
+
         // Inject the Steam overlay's LD_PRELOAD and any inner_env vars via an
         // 'env' wrapper on the inner command
         let inner_assignments = config
@@ -220,7 +244,10 @@ pub fn handle_gamescope_shim() -> ExitCode {
             inner_assignments,
         );
         if !env_wrapper.is_empty() {
-            log_to_file(&format!("Injecting inner 'env' wrapper: {:?}", env_wrapper), debug_enabled);
+            log_to_file(
+                &format!("Injecting inner 'env' wrapper: {:?}", env_wrapper),
+                debug_enabled,
+            );
             cmd.args(&env_wrapper);
         }
 
@@ -228,7 +255,10 @@ pub fn handle_gamescope_shim() -> ExitCode {
         // This ensures it runs AFTER gamescope has started, avoiding capability stripping
         if let Some(c) = &config {
             if let Some(pre_cmd) = c.effective_pre_command() {
-                log_to_file(&format!("Injecting pre_command: {}", pre_cmd), debug_enabled);
+                log_to_file(
+                    &format!("Injecting pre_command: {}", pre_cmd),
+                    debug_enabled,
+                );
                 if let Some(pre_args) = shlex::split(pre_cmd) {
                     cmd.args(pre_args);
                 }
@@ -248,11 +278,50 @@ pub fn handle_gamescope_shim() -> ExitCode {
         }
     }
 
-    // exec() replaces the current process - this never returns on success
-    let err = cmd.exec();
-    log_to_file(&format!("Error: Failed to exec gamescope: {}", err), debug_enabled);
-    eprintln!("Error: Failed to exec gamescope: {}", err);
-    ExitCode::FAILURE
+    // spawn()+wait() rather than exec(): a post_exit hook needs this process
+    // to still be here once gamescope (and the game inside it) has exited.
+    // Command::spawn() inherits the parent's environment the same way exec()
+    // did, so this doesn't change what Steam-set vars (LIBEI_SOCKET,
+    // LD_PRELOAD) the game sees.
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            log_to_file(
+                &format!("Error: Failed to spawn gamescope: {}", e),
+                debug_enabled,
+            );
+            eprintln!("Error: Failed to spawn gamescope: {}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let status = match child.wait() {
+        Ok(status) => status,
+        Err(e) => {
+            log_to_file(
+                &format!("Error: Failed to wait on gamescope: {}", e),
+                debug_enabled,
+            );
+            eprintln!("Error: Failed to wait on gamescope: {}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Some(hook) = config.as_ref().and_then(|c| c.post_exit_hook.as_ref()) {
+        log_to_file(
+            &format!("Running post_exit hook: {}", hook.command),
+            debug_enabled,
+        );
+        if let Err(e) = hooks::execute(hook) {
+            log_to_file(&format!("post_exit hook failed: {}", e), debug_enabled);
+            eprintln!("post_exit hook failed: {}", e);
+        }
+    }
+
+    match status.code() {
+        Some(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        None => ExitCode::FAILURE,
+    }
 }
 
 /// Variables that break gamescope if the compositor process inherits them
@@ -317,10 +386,13 @@ fn build_ld_preload_with_overlay(debug: bool) -> Option<String> {
 
     // Check existing LD_PRELOAD
     let existing_preload = std::env::var("LD_PRELOAD").ok();
-    
+
     if let Some(existing) = existing_preload {
         if existing.contains("gameoverlayrenderer.so") {
-            log_to_file("LD_PRELOAD already contains gameoverlayrenderer.so, mimicking it", debug);
+            log_to_file(
+                "LD_PRELOAD already contains gameoverlayrenderer.so, mimicking it",
+                debug,
+            );
             Some(existing)
         } else {
             let new_preload = format!("{}:{}", overlay_paths, existing);
@@ -393,7 +465,10 @@ mod tests {
             vec!["MANGOHUD=1".to_string()],
         );
 
-        assert_eq!(wrapper, vec!["env", "LD_PRELOAD=/steam/overlay.so", "MANGOHUD=1"]);
+        assert_eq!(
+            wrapper,
+            vec!["env", "LD_PRELOAD=/steam/overlay.so", "MANGOHUD=1"]
+        );
     }
 
     #[test]
