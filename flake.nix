@@ -24,6 +24,11 @@
           pname = "steam-command-runner";
           version = "0.2.0";
 
+          # hidapi's Linux backend (used to switch a UHK keymap over raw USB
+          # HID) links against libudev.
+          nativeBuildInputs = with pkgs; [ pkg-config ];
+          buildInputs = with pkgs; [ udev ];
+
           meta = with pkgs.lib; {
             description = "Steam compatibility tool and command wrapper for Linux gaming";
             homepage = "https://github.com/alisonjenkins/steam-command-runner";
@@ -43,11 +48,13 @@
             rust-analyzer
             clippy
             rustfmt
+            pkg-config
           ];
 
-          # For running tests
+          # For running tests, and linking hidapi's libudev-backed Linux backend
           buildInputs = with pkgs; [
             cacert
+            udev
           ];
         };
 

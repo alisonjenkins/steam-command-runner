@@ -64,4 +64,22 @@ pub enum AppError {
 
     #[error("Game not found: {0}")]
     GameNotFound(String),
+
+    #[error("UHK keymap abbreviation must be 1-{max} ASCII characters, got '{abbreviation}' ({len} chars)")]
+    UhkAbbreviationInvalid {
+        abbreviation: String,
+        len: usize,
+        max: usize,
+    },
+
+    #[error(
+        "No Ultimate Hacking Keyboard found (vendor {vendor_id:#06x} product {product_id:#06x})"
+    )]
+    UhkDeviceNotFound { vendor_id: u16, product_id: u16 },
+
+    #[error("Failed to open Ultimate Hacking Keyboard: {0}")]
+    UhkHidOpen(String),
+
+    #[error("Failed to send command to Ultimate Hacking Keyboard: {0}")]
+    UhkHidWrite(String),
 }
