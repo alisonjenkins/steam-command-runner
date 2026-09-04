@@ -80,4 +80,10 @@ pub enum AppError {
 
     #[error("Failed to send command to Ultimate Hacking Keyboard: {0}")]
     UhkHidWrite(String),
+
+    #[error("UHK rejected keymap abbreviation '{abbreviation}': {reason}")]
+    UhkKeymapSwitchRejected {
+        abbreviation: String,
+        reason: String,
+    },
 }
