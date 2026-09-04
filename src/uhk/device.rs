@@ -11,33 +11,35 @@
     clippy::get_unwrap
 )]
 
+use super::matches_uhk_command_interface;
 use super::protocol::build_switch_keymap_packet;
-use super::{UHK_GENERIC_HID_USAGE_PAGE, UHK_PRODUCT_ID, UHK_VENDOR_ID};
 use crate::error::AppError;
 use hidapi::HidApi;
+use tracing::warn;
 
 /// Sends the UHK firmware's SwitchKeymap command over the keyboard's
-/// generic-HID interface. Not unit tested -- it talks to real hardware; the
-/// packet it sends is `build_switch_keymap_packet`, which is.
-pub fn switch_keymap(abbreviation: &str, vendor_id: u16, product_id: u16) -> Result<(), AppError> {
+/// generic-HID interface, auto-discovering the connected UHK rather than
+/// requiring its vendor/product id up front. Not unit tested -- it talks to
+/// real hardware; the packet it sends is `build_switch_keymap_packet` and the
+/// device it looks for is matched by `matches_uhk_command_interface`, both of
+/// which are.
+pub fn switch_keymap(abbreviation: &str) -> Result<(), AppError> {
     let packet = build_switch_keymap_packet(abbreviation)?;
 
     let api = HidApi::new().map_err(|e| AppError::UhkHidOpen(e.to_string()))?;
 
-    // The UHK exposes several HID interfaces (keyboard, mouse, generic
-    // command channel) at the same vendor/product id -- usage_page picks
-    // out the one that accepts firmware commands.
-    let device_info = api
-        .device_list()
-        .find(|d| {
-            d.vendor_id() == vendor_id
-                && d.product_id() == product_id
-                && d.usage_page() == UHK_GENERIC_HID_USAGE_PAGE
-        })
-        .ok_or(AppError::UhkDeviceNotFound {
-            vendor_id,
-            product_id,
-        })?;
+    let mut candidates = api.device_list().filter(|d| {
+        matches_uhk_command_interface(d.vendor_id(), d.product_id(), d.usage_page(), d.usage())
+    });
+    let device_info = candidates.next().ok_or(AppError::UhkDeviceNotFound)?;
+
+    // A single physical UHK should expose exactly one command interface; more
+    // than one (e.g. a UHK 60 and a UHK 80 both plugged in) is ambiguous, so
+    // send to the first and say so rather than silently guessing which the
+    // caller meant.
+    if candidates.next().is_some() {
+        warn!("multiple UHK command interfaces found, using the first one enumerated");
+    }
 
     let device = device_info
         .open_device(&api)
@@ -55,9 +57,4 @@ pub fn switch_keymap(abbreviation: &str, vendor_id: u16, product_id: u16) -> Res
     }
 
     Ok(())
-}
-
-/// [`switch_keymap`] against the UHK 80's default vendor/product id.
-pub fn switch_keymap_default(abbreviation: &str) -> Result<(), AppError> {
-    switch_keymap(abbreviation, UHK_VENDOR_ID, UHK_PRODUCT_ID)
 }

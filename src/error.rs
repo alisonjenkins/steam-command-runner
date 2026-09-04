@@ -72,10 +72,8 @@ pub enum AppError {
         max: usize,
     },
 
-    #[error(
-        "No Ultimate Hacking Keyboard found (vendor {vendor_id:#06x} product {product_id:#06x})"
-    )]
-    UhkDeviceNotFound { vendor_id: u16, product_id: u16 },
+    #[error("No Ultimate Hacking Keyboard found")]
+    UhkDeviceNotFound,
 
     #[error("Failed to open Ultimate Hacking Keyboard: {0}")]
     UhkHidOpen(String),

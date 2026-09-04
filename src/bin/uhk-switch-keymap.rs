@@ -16,14 +16,6 @@ struct Args {
     /// Keymap abbreviation, exactly as shown in UHK Agent (max 3 characters).
     abbreviation: String,
 
-    /// Override the UHK's USB vendor id (defaults to the UHK 80's).
-    #[arg(long)]
-    vendor_id: Option<u16>,
-
-    /// Override the UHK's USB product id (defaults to the UHK 80's).
-    #[arg(long)]
-    product_id: Option<u16>,
-
     #[arg(short, long)]
     verbose: bool,
 }
@@ -42,10 +34,7 @@ fn main() -> ExitCode {
         .with_ansi(true)
         .init();
 
-    let vendor_id = args.vendor_id.unwrap_or(uhk::UHK_VENDOR_ID);
-    let product_id = args.product_id.unwrap_or(uhk::UHK_PRODUCT_ID);
-
-    match uhk::switch_keymap(&args.abbreviation, vendor_id, product_id) {
+    match uhk::switch_keymap(&args.abbreviation) {
         Ok(()) => {
             tracing::info!(abbreviation = %args.abbreviation, "switched UHK keymap");
             ExitCode::SUCCESS
