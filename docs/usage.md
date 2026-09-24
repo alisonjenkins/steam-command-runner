@@ -97,11 +97,16 @@ stream_bypass_gamescope = false   # keep gamescope for this game while streaming
 stream_overlay = "both"           # keep both overlay builds for this game
 ```
 
-Each streamed launch prints one line to stderr, which reaches the journal via Steam:
+Every launch through the shim writes one line to `~/.steam-command-runner-shim.log`
+saying which way it went, whether or not `shim_debug` is on:
 
 ```
-steam-command-runner: streaming to steam, launching without gamescope, overlay X86_64 only (from .../game.exe)
+2026-09-24T08:40:18Z app 553850: streaming to steam, launching without gamescope, overlay X86_64 only (from .../game.exe)
+2026-09-24T08:36:22Z app 553850: no stream target, launching through gamescope
 ```
+
+Steam throws away a launched game's stderr, so this file is the place to look,
+not the journal.
 
 Setting `gamescope_enabled = false` for a game also launches it directly, stream or not.
 

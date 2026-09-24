@@ -31,8 +31,8 @@ architecture's `gameoverlayrenderer.so` from `LD_PRELOAD`. A 64-bit game keeps
 
 Finding the binary (`find_game_binary`): the last `.exe` argument that exists
 on disk, otherwise the first argument after the last `--` if it is an ELF
-file. If the architecture cannot be read, both overlays stay and the stderr
-line says why.
+file. If the architecture cannot be read, both overlays stay and the decision
+line in `~/.steam-command-runner-shim.log` says why.
 
 The filtered value is the one the game would actually see: `inner_env`, then
 `env`, then inherited (`effective_ld_preload`).

@@ -98,10 +98,12 @@ or a stream that looked right and was not.
 
 ## Diagnosing a launch
 
-- The shim prints one line to stderr for every direct launch, and it reaches
-  the journal through Steam: `journalctl --user | grep steam-command-runner`.
-- `shim_debug = true` in `config.toml` logs every decision and the final
-  command line to `~/.steam-command-runner-shim.log`.
+- Every launch writes one timestamped decision line to
+  `~/.steam-command-runner-shim.log`, whatever `shim_debug` says:
+  `grep 'app ' ~/.steam-command-runner-shim.log | tail`. Steam discards a
+  launched game's stderr, so the journal never sees it.
+- `shim_debug = true` in `config.toml` also logs every step and the final
+  command line to the same file.
 - The Launch Options must call the shim by absolute path
   (`/home/<user>/.local/bin/gamescope -- %command%`). A bare `gamescope` can
   reach the real binary and skip the runner without any error.

@@ -36,12 +36,19 @@ Changing record window: (nil) (0)
 While a stream target is published and `stream.bypass_gamescope` is true (the
 default), the shim runs the game directly on the host display instead of
 wrapping it in gamescope. It keeps `pre_command`, `env`, `inner_env`,
-`game_args` and the hooks. It prints one line to stderr so the decision shows
-in the journal:
+`game_args` and the hooks. Every launch, direct or through gamescope, writes
+one decision line to `~/.steam-command-runner-shim.log`, whether or not
+`shim_debug` is on:
 
 ```
-steam-command-runner: streaming to steam, launching without gamescope, overlay X86_64 only (from .../game.exe)
+2026-09-24T08:40:18Z app 553850: streaming to steam, launching without gamescope, overlay X86_64 only (from .../game.exe)
+2026-09-24T08:36:22Z app 553850: no stream target, launching through gamescope
 ```
+
+An earlier version printed only to stderr and claimed it reached the journal.
+It does not: Steam discards a launched game's stderr. A launch that went
+through gamescope because the stream target was withdrawn too early left no
+trace at all.
 
 Local play is unchanged and keeps gamescope with its per-game tuning.
 
