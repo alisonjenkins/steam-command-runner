@@ -63,7 +63,45 @@ However, this has significant downsides:
 When Steam calls "gamescope", it actually calls our tool. Our tool:
 1.  Detects it is being called as `gamescope`.
 2.  Loads the per-game configuration for the current App ID.
-3.  Constructs the *real* gamescope command line.
-4.  **Replaces itself** (exec) with the real `gamescope` process.
+3.  Runs the `pre_launch` hook, if configured.
+4.  Decides how to launch (`src/shim/launch.rs`):
+    - **gamescope**: the normal case. Builds the real gamescope command line,
+      with game-only variables and the Steam overlay's `LD_PRELOAD` on the
+      inner command.
+    - **direct**: while a Remote Play client is streaming, or when the game
+      sets `gamescope_enabled = false`. Runs the game on the host display and
+      keeps only the Steam overlay that matches the game's architecture.
+5.  Spawns the command, waits for it, runs the `post_exit` hook, and exits with
+    the child's exit code.
 
-This "exec" step is critical: `steam-command-runner` completely disappears from the process tree. To Steam, it looks like it launched `gamescope` directly. This preserves signal handling, overlay injection, and compatibility tool logic perfectly.
+The runner stays in the process tree as the parent. It used to `exec()` and
+vanish, but then there was nothing left to run `post_exit` after the game
+ended. `spawn()` passes the environment on exactly as `exec()` did.
+
+## Why it works this way
+
+The decisions behind the shim, with the evidence for each, are in
+[`docs/adr/`](adr/README.md). Read the relevant record before changing
+launch behaviour. Most of them were learned from a game that would not start
+or a stream that looked right and was not.
+
+| Behaviour | Record |
+|---|---|
+| Shim installed as `gamescope` | [0002](adr/0002-gamescope-shim.md) |
+| Spawn and wait, not exec | [0003](adr/0003-spawn-and-wait.md) |
+| `inner_env` for MangoHud and similar | [0004](adr/0004-inner-env.md) |
+| Overlay `LD_PRELOAD` on the inner command | [0005](adr/0005-overlay-preload-on-inner-command.md) |
+| gamescope sized to the streaming client | [0006](adr/0006-render-at-client-resolution.md) |
+| Streamed games skip gamescope | [0007](adr/0007-streamed-games-skip-gamescope.md) |
+| Only the matching overlay while streaming | [0008](adr/0008-matching-overlay-only.md) |
+| `gamescope_enabled = false` | [0009](adr/0009-gamescope-enabled-false.md) |
+
+## Diagnosing a launch
+
+- The shim prints one line to stderr for every direct launch, and it reaches
+  the journal through Steam: `journalctl --user | grep steam-command-runner`.
+- `shim_debug = true` in `config.toml` logs every decision and the final
+  command line to `~/.steam-command-runner-shim.log`.
+- The Launch Options must call the shim by absolute path
+  (`/home/<user>/.local/bin/gamescope -- %command%`). A bare `gamescope` can
+  reach the real binary and skip the runner without any error.
