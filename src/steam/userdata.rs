@@ -110,19 +110,22 @@ pub fn get_login_users_path() -> Result<PathBuf, AppError> {
 pub fn get_user_names() -> Result<std::collections::HashMap<u64, String>, AppError> {
     let path = get_login_users_path()?;
     let content = fs::read_to_string(&path)?;
-    
+
     let mut names = std::collections::HashMap::new();
     let mut current_steam_id64 = String::new();
-    
+
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Very basic VDF parsing sufficient for this file structure
         // We look for quoted keys that look like steam IDs, and "PersonaName" keys
-        
+
         if trimmed.starts_with('"') {
-            let parts: Vec<&str> = trimmed.split('"').filter(|s| !s.trim().is_empty()).collect();
-            
+            let parts: Vec<&str> = trimmed
+                .split('"')
+                .filter(|s| !s.trim().is_empty())
+                .collect();
+
             if parts.len() == 1 {
                 // Potential SteamID key (section start)
                 let key = parts[0];
@@ -133,7 +136,7 @@ pub fn get_user_names() -> Result<std::collections::HashMap<u64, String>, AppErr
                 // Key-Value pair
                 let key = parts[0];
                 let value = parts[1];
-                
+
                 if key == "PersonaName" && !current_steam_id64.is_empty() {
                     if let Ok(steam_id64) = current_steam_id64.parse::<u64>() {
                         // Convert to 32-bit Account ID
@@ -150,7 +153,7 @@ pub fn get_user_names() -> Result<std::collections::HashMap<u64, String>, AppErr
             }
         }
     }
-    
+
     Ok(names)
 }
 

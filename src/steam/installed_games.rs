@@ -72,10 +72,7 @@ fn get_library_folders() -> Result<Vec<PathBuf>, AppError> {
                     debug!("Found library folder: {}", steamapps.display());
                     folders.push(steamapps);
                 } else {
-                    debug!(
-                        "Library folder does not exist: {}",
-                        steamapps.display()
-                    );
+                    debug!("Library folder does not exist: {}", steamapps.display());
                 }
             }
         }

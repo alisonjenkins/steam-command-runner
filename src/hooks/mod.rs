@@ -7,8 +7,9 @@ use tracing::{debug, info, warn};
 pub fn execute(hook: &HookConfig) -> Result<(), AppError> {
     info!("Executing hook: {}", hook.command);
 
-    let args = shlex::split(&hook.command)
-        .ok_or_else(|| AppError::HookFailed(format!("Failed to parse hook command: {}", hook.command)))?;
+    let args = shlex::split(&hook.command).ok_or_else(|| {
+        AppError::HookFailed(format!("Failed to parse hook command: {}", hook.command))
+    })?;
 
     if args.is_empty() {
         return Err(AppError::HookFailed("Empty hook command".to_string()));

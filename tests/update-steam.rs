@@ -18,10 +18,7 @@ fn scan(world: &mut UpdateSteamWorld) {
 
     if steam_path.exists() {
         if let Ok(entries) = std::fs::read_dir(&steam_path) {
-            world.found_configs = entries
-                .flatten()
-                .filter(|e| e.path().is_dir())
-                .count();
+            world.found_configs = entries.flatten().filter(|e| e.path().is_dir()).count();
         }
     }
 }
@@ -29,10 +26,16 @@ fn scan(world: &mut UpdateSteamWorld) {
 #[then(regex = r#"we should find ([0-9]*) or more localconfig.vdf files"#)]
 fn confirm(world: &mut UpdateSteamWorld, num_configs: String) {
     let expected: usize = num_configs.parse().unwrap_or(0);
-    assert!(world.found_configs >= expected,
-        "Expected at least {} configs, found {}", expected, world.found_configs);
+    assert!(
+        world.found_configs >= expected,
+        "Expected at least {} configs, found {}",
+        expected,
+        world.found_configs
+    );
 }
 
 fn main() {
-    futures::executor::block_on(UpdateSteamWorld::run("tests/features/update-steam/update-steam.feature"));
+    futures::executor::block_on(UpdateSteamWorld::run(
+        "tests/features/update-steam/update-steam.feature",
+    ));
 }

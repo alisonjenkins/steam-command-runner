@@ -40,7 +40,8 @@ pub fn execute_game(config: &MergedConfig, command: Vec<String>) -> Result<ExitC
 /// Detect execution mode based on file extension
 fn detect_execution_mode(path: &str) -> ExecutionMode {
     let path_lower = path.to_lowercase();
-    if path_lower.ends_with(".exe") || path_lower.ends_with(".msi") || path_lower.ends_with(".bat") {
+    if path_lower.ends_with(".exe") || path_lower.ends_with(".msi") || path_lower.ends_with(".bat")
+    {
         debug!("Detected Windows executable, using Proton mode");
         ExecutionMode::Proton
     } else {

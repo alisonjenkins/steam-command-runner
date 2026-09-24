@@ -90,7 +90,10 @@ impl<'a> NativeRunner<'a> {
                 // itself never inherits them
                 let inner_env = self.config.inner_env_assignments();
                 if !inner_env.is_empty() {
-                    debug!("Adding inner_env to gamescope inner command: {:?}", inner_env);
+                    debug!(
+                        "Adding inner_env to gamescope inner command: {:?}",
+                        inner_env
+                    );
                     gs_command.extend(inner_env);
                 }
 
@@ -120,8 +123,7 @@ impl<'a> NativeRunner<'a> {
         }
 
         // Extract command and args
-        let (cmd, args) = command.split_first()
-            .ok_or(AppError::NoCommand)?;
+        let (cmd, args) = command.split_first().ok_or(AppError::NoCommand)?;
 
         info!("Executing: {} {:?}", cmd, args);
 

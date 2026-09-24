@@ -57,7 +57,7 @@ pub struct MergedConfig {
 
     /// Whether shim debug logging is enabled
     pub shim_debug: bool,
-    
+
     /// Arguments to append to the game command
     pub game_args: Option<String>,
 }
@@ -126,14 +126,8 @@ impl MergedConfig {
         };
 
         // Merge hooks (game overrides global)
-        let pre_launch_hook = game
-            .hooks
-            .pre_launch
-            .or(global.hooks.pre_launch);
-        let post_exit_hook = game
-            .hooks
-            .post_exit
-            .or(global.hooks.post_exit);
+        let pre_launch_hook = game.hooks.pre_launch.or(global.hooks.pre_launch);
+        let post_exit_hook = game.hooks.post_exit.or(global.hooks.post_exit);
 
         // Gamescope args: game overrides global
         let gamescope_args = game.gamescope_args.or(global.gamescope.args);
@@ -226,7 +220,10 @@ mod tests {
 
         let merged = MergedConfig::merge(global, Some(game), false, None);
 
-        assert_eq!(merged.inner_env.get("MANGOHUD").map(String::as_str), Some("0"));
+        assert_eq!(
+            merged.inner_env.get("MANGOHUD").map(String::as_str),
+            Some("0")
+        );
         assert_eq!(
             merged.inner_env.get("ENABLE_VKBASALT").map(String::as_str),
             Some("1")

@@ -3,7 +3,10 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "steam-command-runner")]
-#[command(version, about = "Command wrapper for Linux gaming with gamescope integration")]
+#[command(
+    version,
+    about = "Command wrapper for Linux gaming with gamescope integration"
+)]
 #[command(after_help = "Examples:\n  \
     steam-command-runner run /path/to/game\n  \
     steam-command-runner launch-options set-all --dry-run\n  \

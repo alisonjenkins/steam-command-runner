@@ -151,10 +151,7 @@ impl LocalConfig {
             }
 
             // Check for target app
-            if in_apps_section
-                && !in_target_app
-                && parse_quoted_key(trimmed) == Some(&app_id_str)
-            {
+            if in_apps_section && !in_target_app && parse_quoted_key(trimmed) == Some(&app_id_str) {
                 in_target_app = true;
                 app_brace_depth = brace_depth + 1;
                 added_launch_options = false;
@@ -392,7 +389,9 @@ mod tests {
         // New simple format
         assert!(is_our_launch_options("gamescope -- %command%"));
         // Absolute path format
-        assert!(is_our_launch_options("/home/user/.local/bin/gamescope -- %command%"));
+        assert!(is_our_launch_options(
+            "/home/user/.local/bin/gamescope -- %command%"
+        ));
         // Old format with steam-command-runner
         assert!(is_our_launch_options(
             "gamescope $(steam-command-runner gamescope args) -- steam-command-runner run -- %command%"

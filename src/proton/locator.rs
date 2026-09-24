@@ -62,9 +62,7 @@ pub fn locate_proton(requested_version: Option<&str>) -> Result<PathBuf, AppErro
                 .collect();
 
             // Sort by name descending to prefer newer versions
-            proton_versions.sort_by(|a, b| {
-                b.file_name().cmp(&a.file_name())
-            });
+            proton_versions.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
 
             if let Some(entry) = proton_versions.first() {
                 return Ok(entry.path());

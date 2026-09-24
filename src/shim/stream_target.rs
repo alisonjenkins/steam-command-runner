@@ -171,10 +171,16 @@ pub fn apply(args: Vec<String>, target: &StreamTarget) -> Vec<String> {
         }
 
         // Long forms may carry the value inline.
-        let inline_dropped = ["--output-width=", "--output-height=", "--nested-width=",
-                              "--nested-height=", "--prefer-output=", "--nested-refresh="]
-            .iter()
-            .any(|prefix| arg.starts_with(prefix));
+        let inline_dropped = [
+            "--output-width=",
+            "--output-height=",
+            "--nested-width=",
+            "--nested-height=",
+            "--prefer-output=",
+            "--nested-refresh=",
+        ]
+        .iter()
+        .any(|prefix| arg.starts_with(prefix));
         if inline_dropped {
             continue;
         }
@@ -230,9 +236,8 @@ mod tests {
 
     #[test]
     fn parses_a_published_target() {
-        let parsed = StreamTarget::parse(
-            r#"{"output":"steam","width":1280,"height":800,"refresh":60}"#,
-        );
+        let parsed =
+            StreamTarget::parse(r#"{"output":"steam","width":1280,"height":800,"refresh":60}"#);
         assert_eq!(parsed, Some(target()));
     }
 
@@ -272,7 +277,10 @@ mod tests {
         assert_eq!(value_after(&out, "-w").as_deref(), Some("1280"));
         assert_eq!(value_after(&out, "-h").as_deref(), Some("800"));
         assert_eq!(value_after(&out, "-r").as_deref(), Some("60"));
-        assert_eq!(value_after(&out, "--prefer-output").as_deref(), Some("steam"));
+        assert_eq!(
+            value_after(&out, "--prefer-output").as_deref(),
+            Some("steam")
+        );
         assert!(!out.iter().any(|a| a == "2540"));
         assert!(!out.iter().any(|a| a == "1440"));
     }
@@ -283,7 +291,14 @@ mod tests {
             args("-w 2540 -h 1440 -b --rt --hdr-enabled --hdr-debug-force-support -F fsr"),
             &target(),
         );
-        for flag in ["-b", "--rt", "--hdr-enabled", "--hdr-debug-force-support", "-F", "fsr"] {
+        for flag in [
+            "-b",
+            "--rt",
+            "--hdr-enabled",
+            "--hdr-debug-force-support",
+            "-F",
+            "fsr",
+        ] {
             assert!(out.iter().any(|a| a == flag), "lost {flag}");
         }
     }
@@ -293,7 +308,10 @@ mod tests {
         // -O DP-2 would send the game back to the physical display.
         let out = apply(args("-O DP-2 -W 2560 -H 1440"), &target());
         assert!(!out.iter().any(|a| a == "DP-2"));
-        assert_eq!(value_after(&out, "--prefer-output").as_deref(), Some("steam"));
+        assert_eq!(
+            value_after(&out, "--prefer-output").as_deref(),
+            Some("steam")
+        );
         assert_eq!(out.iter().filter(|a| *a == "--prefer-output").count(), 1);
     }
 
@@ -312,7 +330,10 @@ mod tests {
     fn adds_sizing_when_none_was_given() {
         let out = apply(args("-b --rt"), &target());
         assert_eq!(value_after(&out, "-W").as_deref(), Some("1280"));
-        assert_eq!(value_after(&out, "--prefer-output").as_deref(), Some("steam"));
+        assert_eq!(
+            value_after(&out, "--prefer-output").as_deref(),
+            Some("steam")
+        );
     }
 
     #[test]

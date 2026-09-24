@@ -1,6 +1,6 @@
 use cucumber::{given, then, when, World};
 use std::path::PathBuf;
-use steam_command_runner::config::{GlobalConfig, ConfigError};
+use steam_command_runner::config::{ConfigError, GlobalConfig};
 
 #[derive(Debug, Default, World)]
 pub struct ConfigWorld {

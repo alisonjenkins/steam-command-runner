@@ -41,9 +41,15 @@ pub fn handle_install(path: Option<PathBuf>) -> Result<(), AppError> {
     info!("Installed gamescope shim to: {}", target_path.display());
     println!("Installed gamescope shim to: {}", target_path.display());
     println!();
-    println!("Make sure {} is in your PATH before /usr/bin", target_path.parent().unwrap().display());
+    println!(
+        "Make sure {} is in your PATH before /usr/bin",
+        target_path.parent().unwrap().display()
+    );
     println!("You can add this to your shell profile:");
-    println!("  export PATH=\"{}:$PATH\"", target_path.parent().unwrap().display());
+    println!(
+        "  export PATH=\"{}:$PATH\"",
+        target_path.parent().unwrap().display()
+    );
 
     Ok(())
 }
@@ -66,8 +72,14 @@ pub fn handle_uninstall(path: Option<PathBuf>) -> Result<(), AppError> {
         let link_target = fs::read_link(&target_path)?;
 
         // Check if it points to steam-command-runner
-        if !link_target.to_string_lossy().contains("steam-command-runner") {
-            println!("Warning: {} doesn't appear to be our symlink", target_path.display());
+        if !link_target
+            .to_string_lossy()
+            .contains("steam-command-runner")
+        {
+            println!(
+                "Warning: {} doesn't appear to be our symlink",
+                target_path.display()
+            );
             println!("Link target: {}", link_target.display());
             println!("Expected to contain: steam-command-runner");
             return Ok(());

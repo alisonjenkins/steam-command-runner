@@ -173,9 +173,7 @@ fn edit_config(app_id: Option<u32>, name: Option<String>) -> Result<(), AppError
 
     // Open in editor
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
-    let status = std::process::Command::new(&editor)
-        .arg(&path)
-        .status()?;
+    let status = std::process::Command::new(&editor).arg(&path).status()?;
 
     if !status.success() {
         return Err(AppError::EditorFailed(editor));

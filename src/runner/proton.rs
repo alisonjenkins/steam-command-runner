@@ -12,11 +12,7 @@ use tracing::{debug, info};
 fn log_to_file(message: &str) {
     if let Ok(home) = std::env::var("HOME") {
         let log_path = PathBuf::from(&home).join(".steam-command-runner.log");
-        if let Ok(mut file) = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-        {
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
             let timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -36,8 +32,16 @@ fn get_steam_overlay_paths() -> Option<String> {
     let overlay_32 = steam_path.join("ubuntu12_32/gameoverlayrenderer.so");
 
     debug!("Checking for Steam overlay libraries:");
-    debug!("  64-bit: {} (exists: {})", overlay_64.display(), overlay_64.exists());
-    debug!("  32-bit: {} (exists: {})", overlay_32.display(), overlay_32.exists());
+    debug!(
+        "  64-bit: {} (exists: {})",
+        overlay_64.display(),
+        overlay_64.exists()
+    );
+    debug!(
+        "  32-bit: {} (exists: {})",
+        overlay_32.display(),
+        overlay_32.exists()
+    );
 
     if overlay_64.exists() {
         let mut paths = overlay_64.to_string_lossy().to_string();
@@ -149,8 +153,10 @@ impl<'a> ProtonRunner<'a> {
         info!("ProtonRunner starting");
         log_steam_env_vars();
 
-        let config_msg = format!("Config: gamescope_enabled={}, is_gamescope_session={}",
-              self.config.gamescope_enabled, self.config.is_gamescope_session);
+        let config_msg = format!(
+            "Config: gamescope_enabled={}, is_gamescope_session={}",
+            self.config.gamescope_enabled, self.config.is_gamescope_session
+        );
         info!("{}", config_msg);
         log_to_file(&config_msg);
 
@@ -184,7 +190,9 @@ impl<'a> ProtonRunner<'a> {
 
                 // When using gamescope, we need to ensure Steam overlay Vulkan layer is enabled
                 // and gamescope WSI is enabled for proper Steam Input integration
-                log_to_file("Adding env command to enable Steam overlay Vulkan layer for gamescope");
+                log_to_file(
+                    "Adding env command to enable Steam overlay Vulkan layer for gamescope",
+                );
                 full_command.push("env".to_string());
 
                 // Enable the Steam overlay Vulkan layer
@@ -203,15 +211,16 @@ impl<'a> ProtonRunner<'a> {
                 // itself never inherits them
                 let inner_env = self.config.inner_env_assignments();
                 if !inner_env.is_empty() {
-                    log_to_file(&format!("Adding inner_env to inner command: {:?}", inner_env));
+                    log_to_file(&format!(
+                        "Adding inner_env to inner command: {:?}",
+                        inner_env
+                    ));
                     full_command.extend(inner_env);
                 }
 
                 using_gamescope = true;
             }
         }
-
-
 
         // Add Proton executable
         let proton_exe = self.proton_path.join("proton");
@@ -227,8 +236,7 @@ impl<'a> ProtonRunner<'a> {
         full_command.extend(self.config.launch_args.clone());
 
         // Extract command and args
-        let (cmd, args) = full_command.split_first()
-            .ok_or(AppError::NoCommand)?;
+        let (cmd, args) = full_command.split_first().ok_or(AppError::NoCommand)?;
 
         info!("Executing via Proton: {} {:?}", cmd, args);
 
@@ -266,13 +274,19 @@ impl<'a> ProtonRunner<'a> {
         // This is critical: gamescope needs to inherit these so the overlay is loaded
         // into gamescope, not just the game. Steam does this when it sees gamescope
         // in launch options.
-        log_to_file(&format!("LD_PRELOAD handling: using_gamescope={}", using_gamescope));
+        log_to_file(&format!(
+            "LD_PRELOAD handling: using_gamescope={}",
+            using_gamescope
+        ));
         info!("LD_PRELOAD handling: using_gamescope={}", using_gamescope);
 
         if using_gamescope {
             // Set LD_PRELOAD on the process so gamescope loads the overlay
             if let Some(ld_preload) = build_ld_preload_with_overlay() {
-                log_to_file(&format!("Setting LD_PRELOAD on gamescope process: {}", ld_preload));
+                log_to_file(&format!(
+                    "Setting LD_PRELOAD on gamescope process: {}",
+                    ld_preload
+                ));
                 info!("Setting LD_PRELOAD on gamescope process: {}", ld_preload);
                 process.env("LD_PRELOAD", &ld_preload);
             }
@@ -295,7 +309,10 @@ impl<'a> ProtonRunner<'a> {
             // We're inside gamescope (either native session or launched by our wrapper)
             // We still need to set LD_PRELOAD so gameoverlayrenderer.so connects to LIBEI_SOCKET
             if let Some(ld_preload) = build_ld_preload_with_overlay() {
-                log_to_file(&format!("In gamescope session, setting LD_PRELOAD: {}", ld_preload));
+                log_to_file(&format!(
+                    "In gamescope session, setting LD_PRELOAD: {}",
+                    ld_preload
+                ));
                 info!("In gamescope session, setting LD_PRELOAD: {}", ld_preload);
                 process.env("LD_PRELOAD", &ld_preload);
             }

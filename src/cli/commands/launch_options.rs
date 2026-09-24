@@ -46,7 +46,7 @@ fn resolve_user_id(user_id: Option<u64>) -> Result<u64, AppError> {
             } else {
                 // Try to get user names for better display
                 let user_names = crate::steam::userdata::get_user_names().unwrap_or_default();
-                
+
                 println!("Multiple Steam users found:");
                 for id in &user_ids {
                     if let Some(name) = user_names.get(id) {
@@ -86,7 +86,10 @@ fn set_all(backup: bool, dry_run: bool, user_id: Option<u64>) -> Result<(), AppE
     let default_options = generate_default_launch_options();
 
     if dry_run {
-        println!("Dry run - would set launch options for {} games:", games.len());
+        println!(
+            "Dry run - would set launch options for {} games:",
+            games.len()
+        );
         println!("Launch options: {}", default_options);
         println!();
         for game in &games {
@@ -158,10 +161,7 @@ fn clear_all(backup: bool, only_ours: bool, user_id: Option<u64>) -> Result<(), 
     for game in &games {
         if let Some(current_options) = get_launch_options(&config, game.app_id) {
             if only_ours && !is_our_launch_options(&current_options) {
-                debug!(
-                    "Skipping {} ({}) - not set by us",
-                    game.name, game.app_id
-                );
+                debug!("Skipping {} ({}) - not set by us", game.name, game.app_id);
                 skipped += 1;
                 continue;
             }
@@ -176,7 +176,10 @@ fn clear_all(backup: bool, only_ours: bool, user_id: Option<u64>) -> Result<(), 
 
     println!("Cleared launch options for {} games.", cleared);
     if skipped > 0 {
-        println!("Skipped {} games (not set by steam-command-runner).", skipped);
+        println!(
+            "Skipped {} games (not set by steam-command-runner).",
+            skipped
+        );
     }
     println!();
     println!("Note: Restart Steam for changes to take effect.");
