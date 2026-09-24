@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: sh -c 'if command -v cargo >/dev/null; then cargo fmt --all; else nix develop --command cargo fmt --all; fi'
+        language: system
+        types: [rust]
+        pass_filenames: false

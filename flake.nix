@@ -49,6 +49,8 @@
             clippy
             rustfmt
             pkg-config
+            prek
+            git
           ];
 
           # For running tests, and linking hidapi's libudev-backed Linux backend
@@ -56,6 +58,12 @@
             cacert
             udev
           ];
+
+          shellHook = ''
+            if git rev-parse --git-dir >/dev/null 2>&1; then
+              prek install >/dev/null
+            fi
+          '';
         };
 
         # Legacy alias
