@@ -21,6 +21,7 @@ editing history.
 | [0008](0008-matching-overlay-only.md) | Keep only the overlay matching the game while streaming | Accepted, pending live test |
 | [0009](0009-gamescope-enabled-false.md) | `gamescope_enabled = false` means no gamescope | Accepted |
 | [0010](0010-format-on-commit.md) | Format on commit with prek | Accepted |
+| [0011](0011-streamed-games-render-at-client-resolution.md) | Streamed games render at the client's resolution | Accepted |
 
 ## Template
 

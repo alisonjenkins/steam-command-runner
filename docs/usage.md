@@ -97,6 +97,28 @@ stream_bypass_gamescope = false   # keep gamescope for this game while streaming
 stream_overlay = "both"           # keep both overlay builds for this game
 ```
 
+A streamed game also renders at the client's resolution. Unity, Unreal, Godot
+and Source games are recognised from their files and get the engine's
+resolution arguments; the resolution such an engine had saved is put back
+afterwards, in case it saves the streamed size on exit. For other engines,
+add a rule that rewrites the game's own setting for the length of the run;
+the replaced values are put back when the game exits, or at its next launch
+if the shim was killed:
+
+```toml
+# games/553850.toml (Helldivers 2)
+[[stream_resolution_rules]]
+file = "{prefix}/drive_c/users/steamuser/AppData/Roaming/Arrowhead/Helldivers2/user_settings.config"
+pattern = '(?m)^(\s*(?:screen|render)_resolution = \[\s*)\d+(\s+)\d+'
+replacement = '${1}{width}${2}{height}'
+```
+
+`{prefix}` is the Proton prefix and `{game_dir}` the game binary's directory.
+Refer to groups as `$1` or `${1}`. A replacement the pattern could not find
+again is refused, since it could not be put back.
+`stream_set_resolution = false` turns it off for one game, and
+`[stream] set_resolution = false` for all.
+
 Every launch through the shim writes one line to `~/.steam-command-runner-shim.log`
 saying which way it went, whether or not `shim_debug` is on:
 
