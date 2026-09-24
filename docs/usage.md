@@ -68,6 +68,43 @@ This is the most powerful feature. It allows you to configure gamescope argument
     steam-command-runner config edit --app-id 1091500
     ```
 
+### Remote Play streaming
+
+While a Remote Play client is streaming, the shim runs the game directly instead of
+inside gamescope. It knows a stream is active when it can read and parse the stream
+target the host publishes, `$XDG_RUNTIME_DIR/stream-mode/target.json` by default or the
+path in `STEAM_COMMAND_RUNNER_STREAM_TARGET`. A missing, unreadable or malformed target
+means "not streaming": the game launches under gamescope as usual.
+
+Steam only streams a game in game mode, where the client captures the mouse and sends
+relative motion, when the game window is on Steam's own X display. gamescope moves the
+window to a nested display, so Steam streams the desktop instead and camera look stops at
+the edge of the client window.
+
+The direct launch keeps `pre_command`, `[env]`, `[inner_env]`, `game_args` and the hooks.
+It also keeps only the Steam overlay build that matches the game binary. Steam binds game
+capture to the first process whose overlay registers the game window, and a launcher or
+anti-cheat helper of the other bitness can win that race, exit, and freeze the stream.
+
+```toml
+# Global config
+[stream]
+bypass_gamescope = true   # default
+overlay = "auto"          # auto | both | x86_64 | i386
+
+# Per-game config (games/<appid>.toml)
+stream_bypass_gamescope = false   # keep gamescope for this game while streaming
+stream_overlay = "both"           # keep both overlay builds for this game
+```
+
+Each streamed launch prints one line to stderr, which reaches the journal via Steam:
+
+```
+steam-command-runner: streaming to steam, launching without gamescope, overlay X86_64 only (from .../game.exe)
+```
+
+Setting `gamescope_enabled = false` for a game also launches it directly, stream or not.
+
 ### Method 2: Launch Option Generator (Legacy/Alternative)
 You *can* use `steam-command-runner` to generate arguments directly in the launch option string, but this is **not recommended** for general use because it makes launch options messy and harder to maintain.
 
