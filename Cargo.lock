@@ -1838,6 +1838,7 @@ dependencies = [
  "hidapi",
  "humantime",
  "keyvalues-serde",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

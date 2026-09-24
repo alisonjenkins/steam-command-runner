@@ -147,6 +147,13 @@ pub struct StreamConfig {
     /// Which Steam overlay builds the game preloads while streaming
     #[serde(default)]
     pub overlay: OverlayPolicy,
+
+    /// Render a streamed game at the client's resolution (default: true)
+    ///
+    /// A directly launched game otherwise renders at the resolution it saved
+    /// last, which suits no more than one client.
+    #[serde(default = "default_enabled")]
+    pub set_resolution: bool,
 }
 
 impl Default for StreamConfig {
@@ -154,6 +161,7 @@ impl Default for StreamConfig {
         Self {
             bypass_gamescope: true,
             overlay: OverlayPolicy::Auto,
+            set_resolution: true,
         }
     }
 }

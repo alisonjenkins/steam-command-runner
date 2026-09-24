@@ -2,6 +2,7 @@ use super::error::ConfigError;
 use super::game::GameConfig;
 use super::global::{ExecutionMode, GlobalConfig, HookConfig, OverlayPolicy};
 use super::{get_config_path, get_game_config_path};
+use crate::shim::resolution::ResolutionRule;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -66,6 +67,12 @@ pub struct MergedConfig {
 
     /// Which Steam overlay builds to keep in `LD_PRELOAD` while streaming
     pub stream_overlay: OverlayPolicy,
+
+    /// Render a streamed game at the client's resolution
+    pub stream_set_resolution: bool,
+
+    /// Settings-file rewrites for engines with no resolution argument
+    pub stream_resolution_rules: Vec<ResolutionRule>,
 }
 
 impl MergedConfig {
@@ -163,6 +170,10 @@ impl MergedConfig {
                 .stream_bypass_gamescope
                 .unwrap_or(global.stream.bypass_gamescope),
             stream_overlay: game.stream_overlay.unwrap_or(global.stream.overlay),
+            stream_set_resolution: game
+                .stream_set_resolution
+                .unwrap_or(global.stream.set_resolution),
+            stream_resolution_rules: game.stream_resolution_rules,
         }
     }
 
@@ -301,6 +312,40 @@ mod tests {
 
         assert!(!merged.stream_bypass_gamescope);
         assert_eq!(merged.stream_overlay, OverlayPolicy::I386);
+    }
+
+    #[test]
+    fn test_set_resolution_falls_back_to_global() {
+        let global: GlobalConfig = toml::from_str("[stream]\nset_resolution = false\n").unwrap();
+        let merged = MergedConfig::merge(global.clone(), None, false, None);
+        assert!(!merged.stream_set_resolution);
+
+        let game: GameConfig = toml::from_str("stream_set_resolution = true\n").unwrap();
+        let merged = MergedConfig::merge(global, Some(game), false, None);
+        assert!(merged.stream_set_resolution);
+
+        let merged = MergedConfig::merge(GlobalConfig::default(), None, false, None);
+        assert!(merged.stream_set_resolution);
+    }
+
+    #[test]
+    fn test_resolution_rules_parse_from_toml() {
+        let game: GameConfig = toml::from_str(
+            "[[stream_resolution_rules]]\n\
+             file = \"{prefix}/settings.config\"\n\
+             pattern = '(x = )\\d+'\n\
+             replacement = \"${1}{width}\"\n",
+        )
+        .unwrap();
+        let merged = MergedConfig::merge(GlobalConfig::default(), Some(game), false, None);
+
+        assert_eq!(merged.stream_resolution_rules.len(), 1);
+        assert_eq!(
+            merged.stream_resolution_rules[0].file,
+            "{prefix}/settings.config"
+        );
+        assert_eq!(merged.stream_resolution_rules[0].pattern, r"(x = )\d+");
+        assert_eq!(merged.stream_resolution_rules[0].replacement, "${1}{width}");
     }
 
     #[test]

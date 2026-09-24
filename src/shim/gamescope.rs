@@ -4,6 +4,7 @@ use crate::shim::launch::{
     binary_arch, direct_command, effective_ld_preload, filter_overlay, find_game_binary,
     gamescope_decision, launch_mode, overlay_to_keep, LaunchMode,
 };
+use crate::shim::resolution;
 use crate::shim::stream_target::{self, StreamTarget};
 use std::collections::HashMap;
 use std::env;
@@ -105,6 +106,13 @@ pub fn handle_gamescope_shim() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     log_to_file(&format!("Args: {:?}", args), debug_enabled);
 
+    // Before pre_launch, so a hook that backs up or syncs settings never sees
+    // the stream size a killed launch left behind.
+    let journal = get_app_id().and_then(resolution::journal_path);
+    if let Some(path) = &journal {
+        resolution::Restore::recover(path.clone(), log_decision);
+    }
+
     if let Some(hook) = config.as_ref().and_then(|c| c.pre_launch_hook.as_ref()) {
         log_to_file(
             &format!("Running pre_launch hook: {}", hook.command),
@@ -128,11 +136,20 @@ pub fn handle_gamescope_shim() -> ExitCode {
         stream_target.is_some(),
     );
     // With no game command there is nothing to run directly; keep gamescope.
-    let mut cmd = if mode == LaunchMode::Direct && !command.is_empty() {
+    let direct = mode == LaunchMode::Direct && !command.is_empty();
+    // Only a direct launch: under gamescope, -W/-H already set the size.
+    let (resolution_args, resolution_applied) = if direct {
+        stream_resolution(config.as_ref(), &command, stream_target.as_ref())
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    let restore_resolution = resolution::Restore::new(resolution_applied, journal, log_decision);
+    let mut cmd = if direct {
         direct_launch(
             config.as_ref(),
             &command,
             stream_target.as_ref(),
+            &resolution_args,
             debug_enabled,
         )
     } else {
@@ -181,6 +198,9 @@ pub fn handle_gamescope_shim() -> ExitCode {
         }
     };
 
+    // Restore before post_exit, so the hook sees the player's own settings.
+    drop(restore_resolution);
+
     if let Some(hook) = config.as_ref().and_then(|c| c.post_exit_hook.as_ref()) {
         log_to_file(
             &format!("Running post_exit hook: {}", hook.command),
@@ -198,6 +218,78 @@ pub fn handle_gamescope_shim() -> ExitCode {
     }
 }
 
+/// Make a streamed direct launch render at the client's resolution.
+///
+/// Returns engine arguments for the game's command line, and the settings
+/// rules applied, which are undone once the game exits. Nothing for a local
+/// launch, or when the client's size is unknown.
+fn stream_resolution(
+    config: Option<&MergedConfig>,
+    command: &[String],
+    target: Option<&StreamTarget>,
+) -> (Vec<String>, Vec<resolution::Applied>) {
+    let Some(target) = target.filter(|t| t.width > 0 && t.height > 0) else {
+        return (Vec::new(), Vec::new());
+    };
+    if !config.is_none_or(|c| c.stream_set_resolution) {
+        return (Vec::new(), Vec::new());
+    }
+    let (width, height) = (target.width, target.height);
+    let game = find_game_binary(command);
+
+    let prefix = env::var("STEAM_COMPAT_DATA_PATH")
+        .ok()
+        .map(|p| format!("{p}/pfx"));
+    let mut applied = Vec::new();
+
+    let args = match game
+        .as_deref()
+        .and_then(|g| Some((g, resolution::detect_engine(g)?)))
+    {
+        Some((game, engine)) => {
+            let args = resolution::engine_args(engine, width, height);
+            log_decision(&format!(
+                "rendering at {width}x{height}: {engine:?} engine, {}",
+                args.join(" ")
+            ));
+            applied.extend(
+                resolution::engine_saves(engine, game, prefix.as_deref())
+                    .iter()
+                    .filter_map(resolution::snapshot),
+            );
+            args
+        }
+        None => Vec::new(),
+    };
+
+    let game_dir = game
+        .as_deref()
+        .and_then(Path::parent)
+        .map(|d| d.to_string_lossy().into_owned());
+    for rule in config.map_or(&[][..], |c| &c.stream_resolution_rules) {
+        let Some(file) =
+            resolution::expand_path(&rule.file, prefix.as_deref(), game_dir.as_deref())
+        else {
+            log_decision(&format!(
+                "resolution rule skipped, cannot place {}",
+                rule.file
+            ));
+            continue;
+        };
+        match resolution::apply_rule(rule, &file, width, height) {
+            Ok(done) => {
+                log_decision(&format!(
+                    "rendering at {width}x{height}: set in {}",
+                    file.display()
+                ));
+                applied.push(done);
+            }
+            Err(e) => log_decision(&format!("resolution rule failed: {e}")),
+        }
+    }
+    (args, applied)
+}
+
 /// Run the game on the host's own display instead of inside gamescope.
 ///
 /// Steam only streams in game mode, and only then lets the client capture the
@@ -207,13 +299,15 @@ fn direct_launch(
     config: Option<&MergedConfig>,
     command: &[String],
     stream_target: Option<&StreamTarget>,
+    resolution_args: &[String],
     debug_enabled: bool,
 ) -> std::process::Command {
-    let full = direct_command(
+    let mut full = direct_command(
         config.and_then(|c| c.effective_pre_command()),
         command,
         config.and_then(|c| c.game_args.as_deref()),
     );
+    full.extend_from_slice(resolution_args);
     // full is non-empty: the caller only takes this path with a game command.
     let (program, rest) = full
         .split_first()

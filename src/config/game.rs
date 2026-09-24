@@ -1,4 +1,5 @@
 use super::global::{ExecutionMode, HooksConfig, OverlayPolicy};
+use crate::shim::resolution::ResolutionRule;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -57,4 +58,13 @@ pub struct GameConfig {
     /// Override `stream.overlay` for this game
     #[serde(default)]
     pub stream_overlay: Option<OverlayPolicy>,
+
+    /// Override `stream.set_resolution` for this game
+    #[serde(default)]
+    pub stream_set_resolution: Option<bool>,
+
+    /// Settings-file rewrites that set this game's resolution while streamed,
+    /// for engines with no resolution argument
+    #[serde(default)]
+    pub stream_resolution_rules: Vec<ResolutionRule>,
 }
