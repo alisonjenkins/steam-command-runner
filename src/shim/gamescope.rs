@@ -1,6 +1,11 @@
 use crate::config::MergedConfig;
 use crate::hooks;
+use crate::shim::launch::{
+    binary_arch, direct_command, effective_ld_preload, filter_overlay, find_game_binary,
+    launch_mode, overlay_to_keep, LaunchMode,
+};
 use crate::shim::stream_target::{self, StreamTarget};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -112,6 +117,159 @@ pub fn handle_gamescope_shim() -> ExitCode {
     }
     let (cli_gamescope_args, command) = parse_gamescope_args(args);
 
+    let stream_target = StreamTarget::detect();
+    let mode = launch_mode(
+        config.as_ref().map(|c| c.gamescope_enabled).unwrap_or(true),
+        config
+            .as_ref()
+            .map(|c| c.stream_bypass_gamescope)
+            .unwrap_or(true),
+        stream_target.is_some(),
+    );
+    // With no game command there is nothing to run directly; keep gamescope.
+    let mut cmd = if mode == LaunchMode::Direct && !command.is_empty() {
+        direct_launch(
+            config.as_ref(),
+            &command,
+            stream_target.as_ref(),
+            debug_enabled,
+        )
+    } else {
+        match gamescope_launch(
+            config.as_ref(),
+            cli_gamescope_args,
+            &command,
+            stream_target,
+            debug_enabled,
+        ) {
+            Some(cmd) => cmd,
+            None => return ExitCode::FAILURE,
+        }
+    };
+
+    // spawn()+wait() rather than exec(): a post_exit hook needs this process
+    // to still be here once the game has exited. Command::spawn() inherits
+    // the parent's environment the same way exec() did, so this doesn't change
+    // what Steam-set vars (LIBEI_SOCKET, LD_PRELOAD) the game sees.
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            log_to_file(
+                &format!("Error: Failed to spawn {:?}: {}", cmd, e),
+                debug_enabled,
+            );
+            eprintln!("Error: Failed to spawn {:?}: {}", cmd.get_program(), e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let status = match child.wait() {
+        Ok(status) => status,
+        Err(e) => {
+            log_to_file(
+                &format!("Error: Failed to wait on game: {}", e),
+                debug_enabled,
+            );
+            eprintln!("Error: Failed to wait on game: {}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Some(hook) = config.as_ref().and_then(|c| c.post_exit_hook.as_ref()) {
+        log_to_file(
+            &format!("Running post_exit hook: {}", hook.command),
+            debug_enabled,
+        );
+        if let Err(e) = hooks::execute(hook) {
+            log_to_file(&format!("post_exit hook failed: {}", e), debug_enabled);
+            eprintln!("post_exit hook failed: {}", e);
+        }
+    }
+
+    match status.code() {
+        Some(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        None => ExitCode::FAILURE,
+    }
+}
+
+/// Run the game on the host's own display instead of inside gamescope.
+///
+/// Steam only streams in game mode, and only then lets the client capture the
+/// mouse, when it can find the game window on its own X display. gamescope
+/// moves the window to a nested one, so a streamed game is launched bare.
+fn direct_launch(
+    config: Option<&MergedConfig>,
+    command: &[String],
+    stream_target: Option<&StreamTarget>,
+    debug_enabled: bool,
+) -> std::process::Command {
+    let full = direct_command(
+        config.and_then(|c| c.effective_pre_command()),
+        command,
+        config.and_then(|c| c.game_args.as_deref()),
+    );
+    // full is non-empty: the caller only takes this path with a game command.
+    let (program, rest) = full
+        .split_first()
+        .map_or(("", &[][..]), |(p, r)| (p.as_str(), r));
+
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(rest);
+    if let Some(c) = config {
+        cmd.envs(&c.env);
+        cmd.envs(&c.inner_env);
+    }
+
+    let mut summary = match stream_target {
+        Some(target) => format!(
+            "streaming to {}, launching without gamescope",
+            target.output
+        ),
+        None => "gamescope disabled, launching without gamescope".to_string(),
+    };
+
+    // Outside a stream Steam's own LD_PRELOAD is left exactly as it set it.
+    if stream_target.is_some() {
+        let game = find_game_binary(command);
+        let game_arch = game.as_deref().and_then(binary_arch);
+        let policy = config.map(|c| c.stream_overlay).unwrap_or_default();
+        let keep = overlay_to_keep(policy, game_arch);
+
+        let empty = HashMap::new();
+        let ld_preload = effective_ld_preload(
+            config.map_or(&empty, |c| &c.env),
+            config.map_or(&empty, |c| &c.inner_env),
+            env::var("LD_PRELOAD").ok(),
+        );
+        if let Some(ld_preload) = ld_preload {
+            cmd.env("LD_PRELOAD", filter_overlay(&ld_preload, keep));
+        }
+
+        summary.push_str(&match keep {
+            Some(arch) => format!(", overlay {:?} only", arch),
+            None => ", both overlays".to_string(),
+        });
+        summary.push_str(&match (&game, game_arch) {
+            (Some(path), Some(_)) => format!(" (from {})", path.display()),
+            (Some(path), None) => format!(" (architecture of {} unknown)", path.display()),
+            (None, _) => " (no game binary found in the command)".to_string(),
+        });
+    }
+
+    eprintln!("steam-command-runner: {}", summary);
+    log_to_file(&summary, debug_enabled);
+    log_to_file(&format!("Executing directly: {:?}", full), debug_enabled);
+    cmd
+}
+
+/// Build the gamescope command wrapping the game.
+fn gamescope_launch(
+    config: Option<&MergedConfig>,
+    cli_gamescope_args: Vec<String>,
+    command: &[String],
+    stream_target: Option<StreamTarget>,
+    debug_enabled: bool,
+) -> Option<std::process::Command> {
     // Get gamescope args from config
     let config_gamescope_args = if let Some(c) = &config {
         if c.gamescope_enabled {
@@ -134,7 +292,7 @@ pub fn handle_gamescope_shim() -> ExitCode {
     // game started with the desktop's geometry is only scaled into the
     // smaller output afterwards and stays letterboxed. This is the one point
     // in Steam's launch chain that sees the arguments in time.
-    if let Some(target) = StreamTarget::detect() {
+    if let Some(target) = stream_target {
         log_to_file(
             &format!(
                 "Stream target active: {:?}, rewriting size and output",
@@ -178,7 +336,7 @@ pub fn handle_gamescope_shim() -> ExitCode {
             eprintln!("Error: Real gamescope binary not found in PATH");
             eprintln!("Make sure gamescope is installed and the steam-command-runner symlink");
             eprintln!("is not shadowing the real gamescope binary.");
-            return ExitCode::FAILURE;
+            return None;
         }
     };
 
@@ -265,7 +423,7 @@ pub fn handle_gamescope_shim() -> ExitCode {
             }
         }
 
-        cmd.args(&command);
+        cmd.args(command);
 
         // Append explicit game_args from config (e.g. --skip-intro)
         if let Some(c) = &config {
@@ -278,50 +436,7 @@ pub fn handle_gamescope_shim() -> ExitCode {
         }
     }
 
-    // spawn()+wait() rather than exec(): a post_exit hook needs this process
-    // to still be here once gamescope (and the game inside it) has exited.
-    // Command::spawn() inherits the parent's environment the same way exec()
-    // did, so this doesn't change what Steam-set vars (LIBEI_SOCKET,
-    // LD_PRELOAD) the game sees.
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
-        Err(e) => {
-            log_to_file(
-                &format!("Error: Failed to spawn gamescope: {}", e),
-                debug_enabled,
-            );
-            eprintln!("Error: Failed to spawn gamescope: {}", e);
-            return ExitCode::FAILURE;
-        }
-    };
-
-    let status = match child.wait() {
-        Ok(status) => status,
-        Err(e) => {
-            log_to_file(
-                &format!("Error: Failed to wait on gamescope: {}", e),
-                debug_enabled,
-            );
-            eprintln!("Error: Failed to wait on gamescope: {}", e);
-            return ExitCode::FAILURE;
-        }
-    };
-
-    if let Some(hook) = config.as_ref().and_then(|c| c.post_exit_hook.as_ref()) {
-        log_to_file(
-            &format!("Running post_exit hook: {}", hook.command),
-            debug_enabled,
-        );
-        if let Err(e) = hooks::execute(hook) {
-            log_to_file(&format!("post_exit hook failed: {}", e), debug_enabled);
-            eprintln!("post_exit hook failed: {}", e);
-        }
-    }
-
-    match status.code() {
-        Some(code) => ExitCode::from(code.clamp(0, 255) as u8),
-        None => ExitCode::FAILURE,
-    }
+    Some(cmd)
 }
 
 /// Variables that break gamescope if the compositor process inherits them

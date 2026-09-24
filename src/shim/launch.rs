@@ -1,6 +1,7 @@
 //! Decide how the shim launches a game, and prepare a launch without gamescope.
 
 use crate::config::OverlayPolicy;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -126,6 +127,19 @@ pub fn filter_overlay(ld_preload: &str, keep: Option<Arch>) -> String {
         .filter(|entry| !entry.ends_with(drop_suffix))
         .collect::<Vec<_>>()
         .join(":")
+}
+
+/// The `LD_PRELOAD` the game would see: `inner_env`, then `env`, then inherited.
+pub fn effective_ld_preload(
+    env: &HashMap<String, String>,
+    inner_env: &HashMap<String, String>,
+    inherited: Option<String>,
+) -> Option<String> {
+    inner_env
+        .get("LD_PRELOAD")
+        .or_else(|| env.get("LD_PRELOAD"))
+        .cloned()
+        .or(inherited)
 }
 
 /// Command line for running the game without gamescope.
@@ -314,6 +328,48 @@ mod tests {
     #[test]
     fn keeping_both_changes_nothing() {
         assert_eq!(filter_overlay(STEAM_PRELOAD, None), STEAM_PRELOAD);
+    }
+
+    fn map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn inner_env_preload_wins_over_env_and_inherited() {
+        let env = map(&[("LD_PRELOAD", "/env.so")]);
+        let inner = map(&[("LD_PRELOAD", "/inner.so")]);
+        assert_eq!(
+            effective_ld_preload(&env, &inner, Some("/steam.so".to_string())),
+            Some("/inner.so".to_string())
+        );
+    }
+
+    #[test]
+    fn env_preload_wins_over_inherited() {
+        let env = map(&[("LD_PRELOAD", "/env.so")]);
+        assert_eq!(
+            effective_ld_preload(&env, &HashMap::new(), Some("/steam.so".to_string())),
+            Some("/env.so".to_string())
+        );
+    }
+
+    #[test]
+    fn inherited_preload_is_used_without_config() {
+        assert_eq!(
+            effective_ld_preload(
+                &HashMap::new(),
+                &HashMap::new(),
+                Some("/steam.so".to_string())
+            ),
+            Some("/steam.so".to_string())
+        );
+        assert_eq!(
+            effective_ld_preload(&HashMap::new(), &HashMap::new(), None),
+            None
+        );
     }
 
     #[test]
