@@ -33,7 +33,24 @@ Changing record window: (nil) (0)
 
 ## Decision
 
-While a stream target is published and `stream.bypass_gamescope` is true (the
+A launch counts as streamed only when Steam says so. For a game launched from
+a Remote Play client it sets `SteamStreaming=1` and
+`SteamStreamingMaximumResolution=WxH` (seen on 2026-09-24 in the shim's own
+environment for a launch from a Steam Deck). The published target file is not
+enough on its own, for two reasons:
+
+- It comes too late. The host-side watcher writes it when Steam logs the
+  stream, the same second the launch begins, so a launch from the client
+  raced it and went through gamescope.
+- It stays too long. The watcher arms it for a connected client, and a client
+  whose Steam is merely open elsewhere stays connected for hours. A game
+  started at the desk meanwhile would have launched as if streamed.
+
+The file still supplies the output, size and refresh when present. Without it,
+the size comes from `SteamStreamingMaximumResolution` and the output from
+`STEAM_COMMAND_RUNNER_STREAM_OUTPUT`, which only the gamescope path uses.
+
+While a launch is streamed and `stream.bypass_gamescope` is true (the
 default), the shim runs the game directly on the host display instead of
 wrapping it in gamescope. It keeps `pre_command`, `env`, `inner_env`,
 `game_args` and the hooks. Every launch, direct or through gamescope, writes
