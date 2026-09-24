@@ -12,9 +12,10 @@
 //! The resolution has to be right at launch, and this shim is the only point
 //! in Steam's launch chain that sees the arguments.
 //!
-//! The active target is published by the host-side watcher as a small JSON
-//! file, present only while a client is streaming. Its absence is the normal
-//! case and means "leave the arguments alone", so desktop play is untouched.
+//! Steam marks a launch from a Remote Play client with `SteamStreaming=1`,
+//! and only such a launch is treated as streamed, so desktop play is
+//! untouched. The details come from a small JSON file the host-side watcher
+//! publishes, or from Steam's `SteamStreamingMaximumResolution` without one.
 
 use std::env;
 use std::path::PathBuf;
@@ -51,16 +52,70 @@ fn target_path() -> Option<PathBuf> {
 }
 
 impl StreamTarget {
-    /// Read the published target, or `None` when nothing is streaming.
+    /// Where to render this launch, or `None` when it is not a streamed one.
     ///
-    /// A missing file is the ordinary case, not an error. A malformed one is
-    /// also treated as "not streaming": refusing to launch the game because a
-    /// streaming hint could not be parsed would be a far worse failure than
-    /// rendering at the desktop's resolution.
+    /// Only Steam's `SteamStreaming=1` makes a launch streamed. The published
+    /// file stays armed for as long as a client is connected, which can be
+    /// hours of an idle Steam on another device, and a game started at the
+    /// desk in that time is not being streamed. The file supplies the details
+    /// when present; Steam's own variables when not.
+    ///
+    /// A missing or malformed file is not an error: refusing to launch because
+    /// a streaming hint could not be parsed would be far worse than rendering
+    /// at the desktop's resolution.
     pub fn detect() -> Option<Self> {
-        let path = target_path()?;
-        let contents = std::fs::read_to_string(&path).ok()?;
-        Self::parse(&contents)
+        let published = target_path()
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|contents| Self::parse(&contents));
+        Self::resolve(
+            env::var("SteamStreaming").ok().as_deref(),
+            published,
+            env::var("SteamStreamingMaximumResolution").ok().as_deref(),
+            env::var("STEAM_COMMAND_RUNNER_STREAM_OUTPUT")
+                .ok()
+                .as_deref(),
+        )
+    }
+
+    pub fn resolve(
+        streaming: Option<&str>,
+        published: Option<Self>,
+        max_resolution: Option<&str>,
+        output: Option<&str>,
+    ) -> Option<Self> {
+        if streaming != Some("1") {
+            return None;
+        }
+        published.or_else(|| Self::from_steam_env(streaming, max_resolution, output))
+    }
+
+    /// A launch Steam made for a Remote Play stream, from its own environment.
+    ///
+    /// Steam sets `SteamStreaming=1` and `SteamStreamingMaximumResolution` on
+    /// a game launched from a streaming client. That is known at launch time,
+    /// unlike the published target, which a watcher can only write once
+    /// Steam logs the stream, a few seconds after the launch has begun. The
+    /// output name is not part of it, so it comes from our own variable, and
+    /// a size that cannot be read is left at zero: the launch is still a
+    /// streamed one, which is what decides launching without gamescope.
+    pub fn from_steam_env(
+        streaming: Option<&str>,
+        max_resolution: Option<&str>,
+        output: Option<&str>,
+    ) -> Option<Self> {
+        if streaming != Some("1") {
+            return None;
+        }
+        let (width, height) = max_resolution
+            .and_then(|r| r.split_once('x'))
+            .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
+            .unwrap_or((0, 0));
+        Some(Self {
+            output: output.unwrap_or_default().to_string(),
+            width,
+            height,
+            refresh: None,
+        })
     }
 
     pub fn parse(contents: &str) -> Option<Self> {
@@ -199,8 +254,10 @@ pub fn apply(args: Vec<String>, target: &StreamTarget) -> Vec<String> {
     result.push(target.width.to_string());
     result.push("-h".to_string());
     result.push(target.height.to_string());
-    result.push("--prefer-output".to_string());
-    result.push(target.output.clone());
+    if !target.output.is_empty() {
+        result.push("--prefer-output".to_string());
+        result.push(target.output.clone());
+    }
 
     if let Some(refresh) = target.refresh {
         result.push("-r".to_string());
@@ -232,6 +289,63 @@ mod tests {
             .position(|a| a == flag)
             .and_then(|i| args.get(i + 1))
             .cloned()
+    }
+
+    #[test]
+    fn a_streamed_launch_is_recognised_from_steams_environment() {
+        assert_eq!(
+            StreamTarget::from_steam_env(Some("1"), Some("1280x800"), Some("steam")),
+            Some(StreamTarget {
+                output: "steam".to_string(),
+                width: 1280,
+                height: 800,
+                refresh: None,
+            })
+        );
+    }
+
+    #[test]
+    fn a_published_target_alone_does_not_make_a_launch_streamed() {
+        // A client idle on another device keeps the target published.
+        assert_eq!(
+            StreamTarget::resolve(None, Some(target()), None, None),
+            None
+        );
+    }
+
+    #[test]
+    fn a_streamed_launch_prefers_the_published_details() {
+        assert_eq!(
+            StreamTarget::resolve(Some("1"), Some(target()), Some("640x400"), None),
+            Some(target())
+        );
+    }
+
+    #[test]
+    fn a_local_launch_is_not() {
+        assert_eq!(
+            StreamTarget::from_steam_env(None, None, Some("steam")),
+            None
+        );
+        assert_eq!(
+            StreamTarget::from_steam_env(Some("0"), Some("1280x800"), None),
+            None
+        );
+    }
+
+    #[test]
+    fn a_streamed_launch_without_a_size_or_output_still_counts() {
+        let target = StreamTarget::from_steam_env(Some("1"), Some("junk"), None).unwrap();
+        assert_eq!((target.width, target.height), (0, 0));
+        assert!(target.output.is_empty());
+    }
+
+    #[test]
+    fn no_output_name_means_no_prefer_output() {
+        let mut t = target();
+        t.output.clear();
+        let out = apply(args("-W 2540 -H 1440"), &t);
+        assert!(!out.iter().any(|a| a == "--prefer-output"));
     }
 
     #[test]

@@ -229,7 +229,11 @@ fn direct_launch(
     let mut summary = match stream_target {
         Some(target) => format!(
             "streaming to {}, launching without gamescope",
-            target.output
+            if target.output.is_empty() {
+                "a Remote Play client"
+            } else {
+                &target.output
+            }
         ),
         None => "gamescope disabled, launching without gamescope".to_string(),
     };
@@ -298,7 +302,8 @@ fn gamescope_launch(
     // game started with the desktop's geometry is only scaled into the
     // smaller output afterwards and stays letterboxed. This is the one point
     // in Steam's launch chain that sees the arguments in time.
-    if let Some(target) = stream_target {
+    // A target known only from Steam's environment may lack a readable size.
+    if let Some(target) = stream_target.filter(|t| t.width > 0 && t.height > 0) {
         log_to_file(
             &format!(
                 "Stream target active: {:?}, rewriting size and output",
@@ -312,7 +317,7 @@ fn gamescope_launch(
         // moves it afterwards. The host creates the output when a client
         // connects, well before a game is normally launched; this only covers
         // a launch that races it.
-        if !stream_target::wait_for_output(&target.output) {
+        if !target.output.is_empty() && !stream_target::wait_for_output(&target.output) {
             log_to_file(
                 &format!(
                     "Output {} did not appear; launching anyway at its size",
