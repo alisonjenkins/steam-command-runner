@@ -1,4 +1,4 @@
-use super::global::{ExecutionMode, HooksConfig};
+use super::global::{ExecutionMode, HooksConfig, OverlayPolicy};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -49,4 +49,12 @@ pub struct GameConfig {
     /// Arguments to append to the game command
     #[serde(default)]
     pub game_args: Option<String>,
+
+    /// Override `stream.bypass_gamescope` for this game
+    #[serde(default)]
+    pub stream_bypass_gamescope: Option<bool>,
+
+    /// Override `stream.overlay` for this game
+    #[serde(default)]
+    pub stream_overlay: Option<OverlayPolicy>,
 }

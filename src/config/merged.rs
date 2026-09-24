@@ -1,6 +1,6 @@
 use super::error::ConfigError;
 use super::game::GameConfig;
-use super::global::{ExecutionMode, GlobalConfig, HookConfig};
+use super::global::{ExecutionMode, GlobalConfig, HookConfig, OverlayPolicy};
 use super::{get_config_path, get_game_config_path};
 use std::collections::HashMap;
 use std::fs;
@@ -60,6 +60,12 @@ pub struct MergedConfig {
 
     /// Arguments to append to the game command
     pub game_args: Option<String>,
+
+    /// Run the game directly instead of inside gamescope while streaming
+    pub stream_bypass_gamescope: bool,
+
+    /// Which Steam overlay builds to keep in `LD_PRELOAD` while streaming
+    pub stream_overlay: OverlayPolicy,
 }
 
 impl MergedConfig {
@@ -153,6 +159,10 @@ impl MergedConfig {
             gamescope_enabled,
             shim_debug: global.shim_debug,
             game_args: game.game_args.or(global.game_args),
+            stream_bypass_gamescope: game
+                .stream_bypass_gamescope
+                .unwrap_or(global.stream.bypass_gamescope),
+            stream_overlay: game.stream_overlay.unwrap_or(global.stream.overlay),
         }
     }
 
@@ -257,6 +267,40 @@ mod tests {
             merged.inner_env_assignments(),
             vec!["A=b", "ENABLE_VKBASALT=1", "MANGOHUD=1"]
         );
+    }
+
+    #[test]
+    fn test_stream_settings_default_to_bypass_and_auto() {
+        let merged = MergedConfig::merge(GlobalConfig::default(), None, false, None);
+
+        assert!(merged.stream_bypass_gamescope);
+        assert_eq!(merged.stream_overlay, OverlayPolicy::Auto);
+    }
+
+    #[test]
+    fn test_game_overrides_stream_settings() {
+        let game = GameConfig {
+            stream_bypass_gamescope: Some(false),
+            stream_overlay: Some(OverlayPolicy::Both),
+            ..Default::default()
+        };
+
+        let merged = MergedConfig::merge(GlobalConfig::default(), Some(game), false, None);
+
+        assert!(!merged.stream_bypass_gamescope);
+        assert_eq!(merged.stream_overlay, OverlayPolicy::Both);
+    }
+
+    #[test]
+    fn test_stream_settings_parse_from_toml() {
+        let global: GlobalConfig =
+            toml::from_str("[stream]\nbypass_gamescope = false\noverlay = \"x86_64\"\n").unwrap();
+        let game: GameConfig = toml::from_str("stream_overlay = \"i386\"\n").unwrap();
+
+        let merged = MergedConfig::merge(global, Some(game), false, None);
+
+        assert!(!merged.stream_bypass_gamescope);
+        assert_eq!(merged.stream_overlay, OverlayPolicy::I386);
     }
 
     #[test]

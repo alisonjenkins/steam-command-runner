@@ -42,6 +42,10 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub gamescope: GamescopeConfig,
 
+    /// How launches behave while a Remote Play client is streaming
+    #[serde(default)]
+    pub stream: StreamConfig,
+
     /// Arguments to append to the game command
     #[serde(default)]
     pub game_args: Option<String>,
@@ -128,6 +132,50 @@ impl Default for GamescopeConfig {
 
 fn default_enabled() -> bool {
     true
+}
+
+/// Launch behaviour while a Remote Play client is streaming
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamConfig {
+    /// Run the game directly instead of inside gamescope (default: true)
+    ///
+    /// Steam can only stream in game mode, and so capture the mouse, when the
+    /// game window is on its own X display. gamescope moves it to a nested one.
+    #[serde(default = "default_enabled")]
+    pub bypass_gamescope: bool,
+
+    /// Which Steam overlay builds the game preloads while streaming
+    #[serde(default)]
+    pub overlay: OverlayPolicy,
+}
+
+impl Default for StreamConfig {
+    fn default() -> Self {
+        Self {
+            bypass_gamescope: true,
+            overlay: OverlayPolicy::Auto,
+        }
+    }
+}
+
+/// Which `gameoverlayrenderer.so` builds stay in `LD_PRELOAD` while streaming
+///
+/// Steam binds game capture to the first process whose overlay registers the
+/// game window. A launcher or anti-cheat helper of the other bitness can win
+/// that race and then exit, freezing the stream, so `auto` keeps only the
+/// build matching the game binary.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OverlayPolicy {
+    /// Keep the build matching the game binary's architecture
+    #[default]
+    Auto,
+    /// Keep both builds, as Steam does
+    Both,
+    /// Keep only the 64-bit build
+    X86_64,
+    /// Keep only the 32-bit build
+    I386,
 }
 
 fn default_skip_pre_command() -> bool {

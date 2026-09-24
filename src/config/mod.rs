@@ -5,7 +5,10 @@ mod merged;
 
 pub use error::ConfigError;
 pub use game::GameConfig;
-pub use global::{ExecutionMode, GamescopeConfig, GlobalConfig, HookConfig, HooksConfig};
+pub use global::{
+    ExecutionMode, GamescopeConfig, GlobalConfig, HookConfig, HooksConfig, OverlayPolicy,
+    StreamConfig,
+};
 pub use merged::MergedConfig;
 
 use std::path::PathBuf;
