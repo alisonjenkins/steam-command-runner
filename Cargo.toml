@@ -28,6 +28,9 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "blo
 # Path handling
 dirs = "6"
 
+# Timestamps for the shim log
+humantime = "2"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

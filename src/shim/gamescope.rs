@@ -2,7 +2,7 @@ use crate::config::MergedConfig;
 use crate::hooks;
 use crate::shim::launch::{
     binary_arch, direct_command, effective_ld_preload, filter_overlay, find_game_binary,
-    launch_mode, overlay_to_keep, LaunchMode,
+    gamescope_decision, launch_mode, overlay_to_keep, LaunchMode,
 };
 use crate::shim::stream_target::{self, StreamTarget};
 use std::collections::HashMap;
@@ -118,12 +118,13 @@ pub fn handle_gamescope_shim() -> ExitCode {
     let (cli_gamescope_args, command) = parse_gamescope_args(args);
 
     let stream_target = StreamTarget::detect();
+    let bypass_when_streaming = config
+        .as_ref()
+        .map(|c| c.stream_bypass_gamescope)
+        .unwrap_or(true);
     let mode = launch_mode(
         config.as_ref().map(|c| c.gamescope_enabled).unwrap_or(true),
-        config
-            .as_ref()
-            .map(|c| c.stream_bypass_gamescope)
-            .unwrap_or(true),
+        bypass_when_streaming,
         stream_target.is_some(),
     );
     // With no game command there is nothing to run directly; keep gamescope.
@@ -135,6 +136,11 @@ pub fn handle_gamescope_shim() -> ExitCode {
             debug_enabled,
         )
     } else {
+        log_decision(&gamescope_decision(
+            stream_target.as_ref().map(|t| t.output.as_str()),
+            bypass_when_streaming,
+            !command.is_empty(),
+        ));
         match gamescope_launch(
             config.as_ref(),
             cli_gamescope_args,
@@ -257,7 +263,7 @@ fn direct_launch(
     }
 
     eprintln!("steam-command-runner: {}", summary);
-    log_to_file(&summary, debug_enabled);
+    log_decision(&summary);
     log_to_file(&format!("Executing directly: {:?}", full), debug_enabled);
     cmd
 }
@@ -518,6 +524,21 @@ fn build_ld_preload_with_overlay(debug: bool) -> Option<String> {
         log_to_file("Setting new LD_PRELOAD with overlay", debug);
         Some(overlay_paths)
     }
+}
+
+/// The one line written whatever `shim_debug` says. Steam discards a launched
+/// game's stderr, so without it nothing shows which way a launch went.
+fn log_decision(message: &str) {
+    let app = get_app_id().map_or_else(|| "?".to_string(), |id| id.to_string());
+    log_to_file(
+        &format!(
+            "{} app {}: {}",
+            humantime::format_rfc3339_seconds(std::time::SystemTime::now()),
+            app,
+            message
+        ),
+        true,
+    );
 }
 
 fn log_to_file(message: &str, enabled: bool) {

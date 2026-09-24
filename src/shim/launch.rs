@@ -46,6 +46,26 @@ pub fn launch_mode(
     }
 }
 
+/// Why a launch went through gamescope, for the always-on decision line.
+pub fn gamescope_decision(
+    stream_output: Option<&str>,
+    bypass_when_streaming: bool,
+    has_command: bool,
+) -> String {
+    match stream_output {
+        None => "no stream target, launching through gamescope".to_string(),
+        Some(output) if !has_command => format!(
+            "streaming to {}, but there is no game command, launching through gamescope",
+            output
+        ),
+        Some(output) if !bypass_when_streaming => format!(
+            "streaming to {}, but stream bypass_gamescope is off, launching through gamescope",
+            output
+        ),
+        Some(output) => format!("streaming to {}, launching through gamescope", output),
+    }
+}
+
 const PE_MACHINE_AMD64: u16 = 0x8664;
 const PE_MACHINE_I386: u16 = 0x014C;
 const ELF_CLASS_32: u8 = 1;
@@ -158,6 +178,16 @@ pub fn direct_command(
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn gamescope_decision_says_why() {
+        assert_eq!(
+            gamescope_decision(None, true, true),
+            "no stream target, launching through gamescope"
+        );
+        assert!(gamescope_decision(Some("steam"), false, true).contains("bypass_gamescope is off"));
+        assert!(gamescope_decision(Some("steam"), true, false).contains("no game command"));
+    }
 
     fn pe_file(machine: u16) -> tempfile::NamedTempFile {
         let mut bytes = vec![0u8; 0x40];
