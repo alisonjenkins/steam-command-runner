@@ -22,6 +22,7 @@ editing history.
 | [0009](0009-gamescope-enabled-false.md) | `gamescope_enabled = false` means no gamescope | Accepted |
 | [0010](0010-format-on-commit.md) | Format on commit with prek | Accepted |
 | [0011](0011-streamed-games-render-at-client-resolution.md) | Streamed games render at the client's resolution | Accepted |
+| [0012](0012-vr-streamed-games-skip-gamescope.md) | Treat `StreamForOpenVR=1` as a streamed launch | Accepted, pending live test |
 
 ## Template
 

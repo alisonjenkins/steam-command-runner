@@ -13,8 +13,8 @@
 //! in Steam's launch chain that sees the arguments.
 //!
 //! Steam marks a launch from a Remote Play client with `SteamStreaming=1`,
-//! and only such a launch is treated as streamed, so desktop play is
-//! untouched. The details come from a small JSON file the host-side watcher
+//! and one into a Steam Link VR session with `StreamForOpenVR=1`. Only such
+//! a launch is treated as streamed, so desktop play is untouched. The details come from a small JSON file the host-side watcher
 //! publishes, or from Steam's `SteamStreamingMaximumResolution` without one.
 
 use std::env;
@@ -54,11 +54,13 @@ fn target_path() -> Option<PathBuf> {
 impl StreamTarget {
     /// Where to render this launch, or `None` when it is not a streamed one.
     ///
-    /// Only Steam's `SteamStreaming=1` makes a launch streamed. The published
-    /// file stays armed for as long as a client is connected, which can be
-    /// hours of an idle Steam on another device, and a game started at the
-    /// desk in that time is not being streamed. The file supplies the details
-    /// when present; Steam's own variables when not.
+    /// Only Steam's own variables make a launch streamed: `SteamStreaming=1`
+    /// for a Remote Play client, `StreamForOpenVR=1` for a game shown in a
+    /// Steam Link VR session. The published file stays armed for as long as a
+    /// client is connected, which can be hours of an idle Steam on another
+    /// device, and a game started at the desk in that time is not being
+    /// streamed. The file supplies the details when present; Steam's own
+    /// variables when not.
     ///
     /// A missing or malformed file is not an error: refusing to launch because
     /// a streaming hint could not be parsed would be far worse than rendering
@@ -69,6 +71,7 @@ impl StreamTarget {
             .and_then(|contents| Self::parse(&contents));
         Self::resolve(
             env::var("SteamStreaming").ok().as_deref(),
+            env::var("StreamForOpenVR").ok().as_deref(),
             published,
             env::var("SteamStreamingMaximumResolution").ok().as_deref(),
             env::var("STEAM_COMMAND_RUNNER_STREAM_OUTPUT")
@@ -79,14 +82,15 @@ impl StreamTarget {
 
     pub fn resolve(
         streaming: Option<&str>,
+        openvr: Option<&str>,
         published: Option<Self>,
         max_resolution: Option<&str>,
         output: Option<&str>,
     ) -> Option<Self> {
-        if streaming != Some("1") {
+        if streaming != Some("1") && openvr != Some("1") {
             return None;
         }
-        published.or_else(|| Self::from_steam_env(streaming, max_resolution, output))
+        published.or_else(|| Self::from_steam_env(Some("1"), max_resolution, output))
     }
 
     /// A launch Steam made for a Remote Play stream, from its own environment.
@@ -308,7 +312,31 @@ mod tests {
     fn a_published_target_alone_does_not_make_a_launch_streamed() {
         // A client idle on another device keeps the target published.
         assert_eq!(
-            StreamTarget::resolve(None, Some(target()), None, None),
+            StreamTarget::resolve(None, None, Some(target()), None, None),
+            None
+        );
+    }
+
+    #[test]
+    fn a_launch_into_a_vr_stream_counts_as_streamed() {
+        // Steam Link VR sets StreamForOpenVR, never SteamStreaming.
+        assert_eq!(
+            StreamTarget::resolve(None, Some("1"), Some(target()), None, None),
+            Some(target())
+        );
+    }
+
+    #[test]
+    fn a_vr_launch_without_a_published_target_still_counts() {
+        let target = StreamTarget::resolve(None, Some("1"), None, None, Some("steam")).unwrap();
+        assert_eq!(target.output, "steam");
+        assert_eq!((target.width, target.height), (0, 0));
+    }
+
+    #[test]
+    fn stream_for_openvr_other_than_1_is_not_streamed() {
+        assert_eq!(
+            StreamTarget::resolve(None, Some("0"), Some(target()), None, None),
             None
         );
     }
@@ -316,7 +344,7 @@ mod tests {
     #[test]
     fn a_streamed_launch_prefers_the_published_details() {
         assert_eq!(
-            StreamTarget::resolve(Some("1"), Some(target()), Some("640x400"), None),
+            StreamTarget::resolve(Some("1"), None, Some(target()), Some("640x400"), None),
             Some(target())
         );
     }
