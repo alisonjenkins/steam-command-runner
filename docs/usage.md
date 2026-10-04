@@ -70,11 +70,16 @@ This is the most powerful feature. It allows you to configure gamescope argument
 
 ### Remote Play streaming
 
-While a Remote Play client is streaming, the shim runs the game directly instead of
-inside gamescope. It knows a stream is active when it can read and parse the stream
-target the host publishes, `$XDG_RUNTIME_DIR/stream-mode/target.json` by default or the
-path in `STEAM_COMMAND_RUNNER_STREAM_TARGET`. A missing, unreadable or malformed target
-means "not streaming": the game launches under gamescope as usual.
+For a streamed launch, the shim runs the game directly instead of inside gamescope. A
+launch is streamed when Steam says so in the game's environment: `SteamStreaming=1` for
+a Remote Play client, `StreamForOpenVR=1` for a game shown in a Steam Link VR session.
+The output, size and refresh come from the stream target the host publishes,
+`$XDG_RUNTIME_DIR/stream-mode/target.json` by default or the path in
+`STEAM_COMMAND_RUNNER_STREAM_TARGET`. Without one, the size comes from
+`SteamStreamingMaximumResolution` and the output from `STEAM_COMMAND_RUNNER_STREAM_OUTPUT`.
+The target alone does not make a launch streamed: see
+[ADR 0007](adr/0007-streamed-games-skip-gamescope.md) and
+[ADR 0012](adr/0012-vr-streamed-games-skip-gamescope.md).
 
 Steam only streams a game in game mode, where the client captures the mouse and sends
 relative motion, when the game window is on Steam's own X display. gamescope moves the
